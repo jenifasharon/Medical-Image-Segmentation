@@ -1,0 +1,523 @@
+import os
+os.listdir("/kaggle/input")
+import os
+import numpy as np
+import cv2
+
+base_path = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset"
+
+image_dir = os.path.join(base_path, "images")
+mask_dir  = os.path.join(base_path, "masks")
+
+# Count files
+num_images = len(os.listdir(image_dir))
+num_masks  = len(os.listdir(mask_dir))
+
+print("Number of images:", num_images)
+print("Number of masks :", num_masks)
+
+# Check mask class values
+classes_found = set()
+
+for m in os.listdir(mask_dir):
+    mask_path = os.path.join(mask_dir, m)
+    mask = cv2.imread(mask_path, 0)
+    if mask is not None:
+        unique_vals = np.unique(mask)
+        classes_found.update(unique_vals)
+
+print("\nClasses inside masks:", classes_found)
+print(f"\nTotal unique classes found: {len(classes_found)}")
+
+# ==========================
+# 🔥 KAGGLE FULL SEGMENTATION PREP CODE (Single Cell)
+# ==========================
+
+import os
+import numpy as np
+import pandas as pd
+import cv2
+import matplotlib.pyplot as plt
+import albumentations as A
+
+# ==========================
+# 1. Paths
+# ==========================
+BASE_PATH = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset"
+
+IMAGE_FOLDER = os.path.join(BASE_PATH, "images")
+MASK_FOLDER  = os.path.join(BASE_PATH, "masks")
+
+print("Image folder:", IMAGE_FOLDER)
+print("Mask folder :", MASK_FOLDER)
+
+# ==========================
+# 2. Create DataFrame
+# ==========================
+image_files = sorted(os.listdir(IMAGE_FOLDER))
+mask_files  = sorted(os.listdir(MASK_FOLDER))
+
+df = pd.DataFrame({
+    "img_path": [os.path.join(IMAGE_FOLDER, f) for f in image_files],
+    "mask_path": [os.path.join(MASK_FOLDER, f) for f in mask_files]
+})
+
+print("\nTotal images :", len(df))
+print("Total masks  :", len(df))
+df.head()
+
+# ==========================
+# 3. Display Random Samples
+# ==========================
+def display_samples(df, num_samples=5):
+    random_indices = np.random.choice(df.index, size=num_samples, replace=False)
+    fig, axes = plt.subplots(num_samples, 2, figsize=(10, num_samples * 3))
+
+    for i, idx in enumerate(random_indices):
+        img = cv2.imread(df.iloc[idx]['img_path'])
+        mask = cv2.imread(df.iloc[idx]['mask_path'], cv2.IMREAD_GRAYSCALE)
+
+        axes[i, 0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        axes[i, 0].set_title("Original Image")
+        axes[i, 0].axis("off")
+
+        axes[i, 1].imshow(mask, cmap="gray")
+        axes[i, 1].set_title("Mask")
+        axes[i, 1].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+print("\n🔹 Showing 5 random samples from dataset...")
+display_samples(df, num_samples=5)
+
+# ==========================
+# 4. Albumentations Augmentation
+# ==========================
+augmentation = A.Compose([
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.Rotate(limit=20, p=0.5),
+    A.RandomBrightnessContrast(p=0.3),
+    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.3),
+])
+
+def augment_image(image_path, mask_path):
+    image = cv2.imread(image_path)
+    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+    augmented = augmentation(image=image, mask=mask)
+    return augmented['image'], augmented['mask']
+
+# ==========================
+# 5. Display Augmented Samples
+# ==========================
+def display_augmented_samples(df, num_samples=5):
+    random_indices = np.random.choice(df.index, size=num_samples, replace=False)
+    fig, axes = plt.subplots(num_samples, 4, figsize=(15, num_samples * 3))
+
+    for i, idx in enumerate(random_indices):
+        img = cv2.imread(df.iloc[idx]['img_path'])
+        mask = cv2.imread(df.iloc[idx]['mask_path'], cv2.IMREAD_GRAYSCALE)
+        aug_img, aug_mask = augment_image(df.iloc[idx]['img_path'], df.iloc[idx]['mask_path'])
+
+        axes[i, 0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        axes[i, 0].set_title("Original Image")
+        axes[i, 0].axis("off")
+
+        axes[i, 1].imshow(mask, cmap="gray")
+        axes[i, 1].set_title("Original Mask")
+        axes[i, 1].axis("off")
+
+        axes[i, 2].imshow(cv2.cvtColor(aug_img, cv2.COLOR_BGR2RGB))
+        axes[i, 2].set_title("Augmented Image")
+        axes[i, 2].axis("off")
+
+        axes[i, 3].imshow(aug_mask, cmap="gray")
+        axes[i, 3].set_title("Augmented Mask")
+        axes[i, 3].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+print("\n🔹 Showing 5 augmented sample pairs...")
+display_augmented_samples(df, num_samples=5)
+
+# ============================================================
+# FAST PURE-TF PIPELINE: U-Net++ train + Dice/IoU/mAP/HD95/ASSD
+# Single cell - Kaggle-ready (images/ and masks/ under BASE_PATH)
+# ============================================================
+
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from glob import glob
+import tensorflow as tf
+from tensorflow.keras import layers, Model
+from scipy.spatial import cKDTree
+from scipy.ndimage import binary_erosion
+import random
+from sklearn.model_selection import train_test_split
+
+# --------------------------
+# Settings (you asked these)
+# --------------------------
+BASE_PATH = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset"
+IMAGE_FOLDER = os.path.join(BASE_PATH, "images")
+MASK_FOLDER  = os.path.join(BASE_PATH, "masks")
+
+IMG_SIZE = 256
+BATCH_SIZE = 32
+EPOCHS = 35
+SEED = 42
+
+tf.random.set_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
+
+AUTOTUNE = tf.data.AUTOTUNE
+
+# --------------------------
+# Discover files & DF
+# --------------------------
+image_paths = sorted(glob(os.path.join(IMAGE_FOLDER, "*")))
+mask_paths  = sorted(glob(os.path.join(MASK_FOLDER, "*")))
+
+assert len(image_paths) == len(mask_paths), f"Images ({len(image_paths)}) and masks ({len(mask_paths)}) count mismatch!"
+
+df = pd.DataFrame({"img_path": image_paths, "mask_path": mask_paths})
+print("Total samples:", len(df))
+display(df.head())
+
+# --------------------------
+# Train/Val split
+# --------------------------
+train_df, val_df = train_test_split(df, test_size=0.15, random_state=SEED)
+train_df = train_df.reset_index(drop=True)
+val_df   = val_df.reset_index(drop=True)
+print("Train:", len(train_df), "Val:", len(val_df))
+
+# --------------------------
+# TF read / preprocess / augment
+# --------------------------
+def _read_image(path):
+    x = tf.io.read_file(path)
+    img = tf.image.decode_image(x, channels=3, expand_animations=False)
+    img = tf.image.convert_image_dtype(img, tf.float32)  # [0,1]
+    return img
+
+def _read_mask(path):
+    x = tf.io.read_file(path)
+    m = tf.image.decode_image(x, channels=1, expand_animations=False)
+    m = tf.image.convert_image_dtype(m, tf.float32)  # [0,1]
+    # binarize masks (threshold 0.5)
+    m = tf.where(m > 0.5, 1.0, 0.0)
+    return m
+
+def _resize(img, mask):
+    img = tf.image.resize(img, [IMG_SIZE, IMG_SIZE])
+    mask = tf.image.resize(mask, [IMG_SIZE, IMG_SIZE], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    return img, mask
+
+def _augment(img, mask):
+    # flips
+    if tf.random.uniform([]) < 0.5:
+        img = tf.image.flip_left_right(img); mask = tf.image.flip_left_right(mask)
+    if tf.random.uniform([]) < 0.5:
+        img = tf.image.flip_up_down(img); mask = tf.image.flip_up_down(mask)
+    # rotation 0/90/180/270
+    k = tf.random.uniform([], minval=0, maxval=4, dtype=tf.int32)
+    img = tf.image.rot90(img, k); mask = tf.image.rot90(mask, k)
+    # brightness/contrast
+    if tf.random.uniform([]) < 0.3:
+        img = tf.image.random_brightness(img, 0.08)
+        img = tf.image.random_contrast(img, 0.9, 1.1)
+    return img, mask
+
+def _map_train(img_path, mask_path):
+    img = _read_image(img_path)
+    mask = _read_mask(mask_path)
+    img, mask = _resize(img, mask)
+    img, mask = _augment(img, mask)
+    return img, mask
+
+def _map_val(img_path, mask_path):
+    img = _read_image(img_path)
+    mask = _read_mask(mask_path)
+    img, mask = _resize(img, mask)
+    return img, mask
+
+# --------------------------
+# Build tf.data datasets
+# --------------------------
+def paths_to_dataset(df, batch_size=BATCH_SIZE, training=True):
+    img_paths = df['img_path'].values.astype(str)
+    msk_paths = df['mask_path'].values.astype(str)
+    ds = tf.data.Dataset.from_tensor_slices((img_paths, msk_paths))
+    if training:
+        ds = ds.shuffle(len(img_paths), seed=SEED, reshuffle_each_iteration=True)
+        ds = ds.map(lambda a,b: _map_train(a,b), num_parallel_calls=AUTOTUNE)
+    else:
+        ds = ds.map(lambda a,b: _map_val(a,b), num_parallel_calls=AUTOTUNE)
+    ds = ds.batch(batch_size).prefetch(AUTOTUNE)
+    return ds
+
+train_ds = paths_to_dataset(train_df, batch_size=BATCH_SIZE, training=True)
+val_ds   = paths_to_dataset(val_df,   batch_size=BATCH_SIZE, training=False)
+
+# quick sanity: peek one batch shapes
+for xb, yb in train_ds.take(1):
+    print("batch image shape:", xb.shape, "batch mask shape:", yb.shape)
+
+# --------------------------
+# Build U-Net++ model
+# --------------------------
+# Implementation: nested dense skip connections (4 depth levels)
+def conv_block(x, filters, name=None):
+    x = layers.Conv2D(filters, 3, padding='same', activation='relu', name=None)(x)
+    x = layers.Conv2D(filters, 3, padding='same', activation='relu', name=None)(x)
+    return x
+
+def upsample_concat(x, skip):
+    x = layers.UpSampling2D((2,2))(x)
+    x = layers.Concatenate()([x, skip])
+    return x
+
+def build_unet_pp(input_shape=(IMG_SIZE, IMG_SIZE, 3), n_classes=1, base_filters=32):
+    inputs = layers.Input(input_shape)
+
+    # level 0
+    x00 = conv_block(inputs, base_filters)
+    p0 = layers.MaxPooling2D((2,2))(x00)
+
+    # level 1
+    x10 = conv_block(p0, base_filters*2)
+    p1 = layers.MaxPooling2D((2,2))(x10)
+
+    # level 2
+    x20 = conv_block(p1, base_filters*4)
+    p2 = layers.MaxPooling2D((2,2))(x20)
+
+    # level 3
+    x30 = conv_block(p2, base_filters*8)
+    p3 = layers.MaxPooling2D((2,2))(x30)
+
+    # bottleneck
+    x40 = conv_block(p3, base_filters*16)
+
+    # decoder with nested connections
+    # x31: concat of x30 and up(x40)
+    x31 = conv_block(layers.Concatenate()([x30, layers.UpSampling2D((2,2))(x40)]), base_filters*8)
+
+    # x21: concat of x20, up(x31)
+    x21 = conv_block(layers.Concatenate()([x20, layers.UpSampling2D((2,2))(x31)]), base_filters*4)
+
+    # x11: concat of x10, up(x21)
+    x11 = conv_block(layers.Concatenate()([x10, layers.UpSampling2D((2,2))(x21)]), base_filters*2)
+
+    # x01: concat of x00, up(x11)
+    x01 = conv_block(layers.Concatenate()([x00, layers.UpSampling2D((2,2))(x11)]), base_filters)
+
+    # More nested skip refinement (to mimic UNet++ full dense skip)
+    # x22: concat(x20, up(x31), up2(x40)) - we keep a simpler but effective nesting
+    x22 = conv_block(layers.Concatenate()([x20,
+                                           layers.UpSampling2D((2,2))(x31),
+                                           layers.UpSampling2D((4,4))(x40)]), base_filters*4)
+
+    x12 = conv_block(layers.Concatenate()([x10,
+                                           layers.UpSampling2D((2,2))(x21),
+                                           layers.UpSampling2D((4,4))(x31)]), base_filters*2)
+
+    x02 = conv_block(layers.Concatenate()([x00,
+                                           layers.UpSampling2D((2,2))(x11),
+                                           layers.UpSampling2D((4,4))(x21)]), base_filters)
+
+    # final aggregation - concatenate several refined feature maps and produce output
+    final_feat = layers.Concatenate()([x01, x02, layers.UpSampling2D((2,2))(x11)])
+    outputs = layers.Conv2D(n_classes, 1, activation='sigmoid')(final_feat)
+
+    model = Model(inputs, outputs, name='UNetPP_simple')
+    return model
+
+# Build model
+model = build_unet_pp()
+model.summary()
+
+# --------------------------
+# Loss & training metric (TF)
+# --------------------------
+def dice_coef_tf(y_true, y_pred, smooth=1e-6):
+    y_true_f = tf.reshape(y_true, [-1])
+    y_pred_f = tf.reshape(y_pred, [-1])
+    inter = tf.reduce_sum(y_true_f * y_pred_f)
+    return (2. * inter + smooth) / (tf.reduce_sum(y_true_f) + tf.reduce_sum(y_pred_f) + smooth)
+
+def bce_dice_loss(y_true, y_pred):
+    bce = tf.keras.losses.binary_crossentropy(y_true, y_pred)
+    return tf.reduce_mean(bce) + (1.0 - dice_coef_tf(y_true, y_pred))
+
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(1e-4),
+    loss=bce_dice_loss,
+    metrics=[dice_coef_tf, tf.keras.metrics.MeanIoU(num_classes=2)]
+)
+
+# --------------------------
+# Numpy helpers for metrics (IoU/Dice/HD95/ASSD/mAP)
+# --------------------------
+def iou_np(y_true, y_pred, smooth=1e-6):
+    yt = (y_true > 0.5).astype(np.uint8)
+    yp = (y_pred > 0.5).astype(np.uint8)
+    inter = np.logical_and(yt, yp).sum()
+    union = np.logical_or(yt, yp).sum()
+    if union == 0:
+        return 1.0
+    return (inter + smooth) / (union + smooth)
+
+def dice_np(y_true, y_pred, smooth=1e-6):
+    yt = (y_true > 0.5).astype(np.uint8)
+    yp = (y_pred > 0.5).astype(np.uint8)
+    inter = np.logical_and(yt, yp).sum()
+    denom = yt.sum() + yp.sum()
+    if denom == 0:
+        return 1.0
+    return (2*inter + smooth) / (denom + smooth)
+
+def surface_distances(a, b, spacing=1.0):
+    # returns distances from surface points of a to nearest surface point in b
+    if a.sum() == 0 or b.sum() == 0:
+        return np.array([])
+    eroded_a = binary_erosion(a)
+    surf_a = a ^ eroded_a
+    pts_a = np.vstack(np.where(surf_a)).T
+    eroded_b = binary_erosion(b)
+    surf_b = b ^ eroded_b
+    pts_b = np.vstack(np.where(surf_b)).T
+    if pts_a.size == 0 or pts_b.size == 0:
+        return np.array([])
+    tree = cKDTree(pts_b * spacing)
+    dists, _ = tree.query(pts_a * spacing, k=1)
+    return dists
+
+def hd95_np(y_true, y_pred):
+    a = (y_true > 0.5).astype(np.uint8)
+    b = (y_pred > 0.5).astype(np.uint8)
+    if a.sum() == 0 and b.sum() == 0:
+        return 0.0
+    if a.sum() == 0 or b.sum() == 0:
+        return np.nan
+    da = surface_distances(a, b)
+    db = surface_distances(b, a)
+    if da.size == 0 or db.size == 0:
+        return np.nan
+    return max(np.percentile(da,95), np.percentile(db,95))
+
+def assd_np(y_true, y_pred):
+    a = (y_true > 0.5).astype(np.uint8)
+    b = (y_pred > 0.5).astype(np.uint8)
+    if a.sum() == 0 and b.sum() == 0:
+        return 0.0
+    if a.sum() == 0 or b.sum() == 0:
+        return np.nan
+    da = surface_distances(a, b)
+    db = surface_distances(b, a)
+    if da.size == 0 or db.size == 0:
+        return np.nan
+    return 0.5 * (da.mean() + db.mean())
+
+def compute_map(iou_list, thresholds=np.arange(0.5, 1.0, 0.05)):
+    ious = np.array(iou_list)
+    aps = []
+    for t in thresholds:
+        aps.append(np.mean(ious >= t))
+    return np.mean(aps)
+
+# --------------------------
+# Callback: compute val metrics & save best model by val_dice
+# --------------------------
+class ValMetricsCallback(tf.keras.callbacks.Callback):
+    def __init__(self, val_dataset, save_path="unetpp_kidney_best.h5"):
+        super().__init__()
+        self.val_dataset = val_dataset
+        self.best_dice = -1.0
+        self.save_path = save_path
+
+    def on_epoch_end(self, epoch, logs=None):
+        preds = []
+        gts = []
+        for batch in self.val_dataset:
+            imgs, masks = batch
+            p = self.model.predict(imgs, verbose=0)
+            preds.append(p)
+            gts.append(masks.numpy())
+        preds = np.vstack(preds)
+        gts = np.vstack(gts)
+
+        n = len(preds)
+        dices = []; ious = []; hd95s = []; assds = []
+        for i in range(n):
+            gt = gts[i,...,0]
+            pr = preds[i,...,0]
+            dices.append(dice_np(gt, pr))
+            ious.append(iou_np(gt, pr))
+            hd95s.append(hd95_np(gt, pr))
+            assds.append(assd_np(gt, pr))
+
+        mean_dice = np.nanmean(dices)
+        mean_iou  = np.nanmean(ious)
+        mean_hd95 = np.nanmean([x for x in hd95s if not np.isnan(x)]) if np.any(~np.isnan(hd95s)) else np.nan
+        mean_assd = np.nanmean([x for x in assds if not np.isnan(x)]) if np.any(~np.isnan(assds)) else np.nan
+        mean_map  = compute_map(ious)
+
+        print(f"\nEpoch {epoch+1} VAL: Dice={mean_dice:.4f}, IoU={mean_iou:.4f}, mAP={mean_map:.4f}, HD95={mean_hd95 if not np.isnan(mean_hd95) else 'nan'}, ASSD={mean_assd if not np.isnan(mean_assd) else 'nan'}")
+
+        # attach to logs (so they appear in History.history)
+        if logs is not None:
+            logs['val_dice'] = mean_dice
+            logs['val_iou']  = mean_iou
+            logs['val_map']  = mean_map
+            logs['val_hd95'] = mean_hd95
+            logs['val_assd'] = mean_assd
+
+        # save best model by validation Dice
+        if mean_dice > self.best_dice:
+            print(f"Validation Dice improved ({self.best_dice:.4f} -> {mean_dice:.4f}). Saving model to {self.save_path}")
+            self.best_dice = mean_dice
+            self.model.save(self.save_path)
+
+# --------------------------
+# Callbacks & Train
+# --------------------------
+val_metrics_cb = ValMetricsCallback(val_ds, save_path="unetpp_kidney_best.h5")
+callbacks = [
+    tf.keras.callbacks.ModelCheckpoint("unetpp_kidney_by_loss.h5", save_best_only=True, monitor='val_loss', mode='min'),
+    tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=4, min_lr=1e-7),
+    val_metrics_cb
+]
+
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=EPOCHS,
+    callbacks=callbacks
+)
+
+# --------------------------
+# Show some validation predictions
+# --------------------------
+def show_predictions(model, dataset, n=4):
+    it = iter(dataset.unbatch().batch(1))
+    for i in range(n):
+        x,y = next(it)
+        p = model.predict(x)[0,...,0]
+        img = (x[0].numpy()*255).astype(np.uint8)
+        gt  = y[0,...,0].numpy()
+        pred_bin = (p > 0.5).astype(np.uint8)
+        fig, ax = plt.subplots(1,3, figsize=(12,4))
+        ax[0].imshow(img); ax[0].set_title("Image"); ax[0].axis('off')
+        ax[1].imshow(gt, cmap='gray'); ax[1].set_title("GT"); ax[1].axis('off')
+        ax[2].imshow(pred_bin, cmap='gray'); ax[2].set_title("Pred"); ax[2].axis('off')
+        plt.show()
+
+print("\nShowing some validation predictions...")
+show_predictions(model, val_ds, n=4)
