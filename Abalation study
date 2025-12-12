@@ -1,0 +1,814 @@
+import os
+os.listdir("/kaggle/input")
+
+#...................['kidney-segmentation-dataset']................#
+
+import os
+from glob import glob
+
+# Base dataset path
+dataset_base = '/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/'
+
+# Paths to images and masks
+images_path = os.path.join(dataset_base, 'images')
+masks_path = os.path.join(dataset_base, 'masks')
+
+# Get all files
+image_files = glob(os.path.join(images_path, '*'))
+mask_files = glob(os.path.join(masks_path, '*'))
+
+# Print counts
+print("Total images:", len(image_files))
+print("Total masks:", len(mask_files))
+
+# If you want them in a tuple like before
+counts = (len(image_files), len(mask_files))
+print("Counts (images, masks):", counts)
+
+#................Total images: 2027
+Total masks: 2027
+Counts (images, masks): (2027, 2027).....................#
+
+import os
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# ==============================
+# Dataset directories
+# ==============================
+image_dir = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/images"
+mask_dir  = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/masks"
+
+# ==============================
+# Gather files and match images to masks
+# ==============================
+image_files = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)
+                      if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+mask_files = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)
+                     if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+
+if len(image_files) != len(mask_files):
+    print(f"Warning: {len(image_files)} images vs {len(mask_files)} masks")
+
+# Create a dataframe
+df = pd.DataFrame({'img_path': image_files, 'mask_path': mask_files})
+
+# ==============================
+# Split dataset: 8:1:1
+# ==============================
+# First split into train (80%) and temp (20%)
+train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42, shuffle=True)
+
+# Then split temp into validation (10%) and test (10%)
+val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42, shuffle=True)
+
+# Reset indices
+train_df = train_df.reset_index(drop=True)
+val_df = val_df.reset_index(drop=True)
+test_df = test_df.reset_index(drop=True)
+
+# ==============================
+# Summary
+# ==============================
+print(f"Total samples: {len(df)}")
+print(f"Training samples: {len(train_df)}")
+print(f"Validation samples: {len(val_df)}")
+print(f"Test samples: {len(test_df)}")
+
+# Optional: show first 5 entries
+train_df.head()
+
+import os
+import numpy as np
+import pandas as pd
+import cv2
+import matplotlib.pyplot as plt
+import albumentations as A
+from albumentations.core.composition import OneOf
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+# Function to visualize random images with their masks
+def display_samples(df, num_samples=5):
+    random_indices = np.random.choice(df.index, size=num_samples, replace=False)
+    fig, axes = plt.subplots(num_samples, 2, figsize=(10, num_samples * 3))
+
+    for i, idx in enumerate(random_indices):
+        img = cv2.imread(df.iloc[idx]['img_path'])
+        mask = cv2.imread(df.iloc[idx]['mask_path'], cv2.IMREAD_GRAYSCALE)
+
+        axes[i, 0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        axes[i, 0].set_title("Original Image")
+        axes[i, 0].axis("off")
+
+        axes[i, 1].imshow(mask, cmap="gray")
+        axes[i, 1].set_title("Mask")
+        axes[i, 1].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+# Display 5 random samples
+display_samples(df, num_samples=5)
+
+# Define Augmentation Pipeline using Albumentations
+augmentation = A.Compose([
+    A.HorizontalFlip(p=0.5),   # Random horizontal flip
+    A.VerticalFlip(p=0.5),     # Random vertical flip
+    A.Rotate(limit=20, p=0.5), # Random rotation
+    A.RandomBrightnessContrast(p=0.3),
+    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.3),
+])
+
+# Function to apply augmentation on an image-mask pair
+def augment_image(image_path, mask_path):
+    image = cv2.imread(image_path)
+    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+
+    augmented = augmentation(image=image, mask=mask)
+    return augmented['image'], augmented['mask']
+
+# Visualize Augmented Images
+def display_augmented_samples(df, num_samples=5):
+    random_indices = np.random.choice(df.index, size=num_samples, replace=False)
+    fig, axes = plt.subplots(num_samples, 4, figsize=(15, num_samples * 3))
+
+    for i, idx in enumerate(random_indices):
+        img = cv2.imread(df.iloc[idx]['img_path'])
+        mask = cv2.imread(df.iloc[idx]['mask_path'], cv2.IMREAD_GRAYSCALE)
+        aug_img, aug_mask = augment_image(df.iloc[idx]['img_path'], df.iloc[idx]['mask_path'])
+
+        # Original Image
+        axes[i, 0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        axes[i, 0].set_title("Original Image")
+        axes[i, 0].axis("off")
+
+        # Original Mask
+        axes[i, 1].imshow(mask, cmap="gray")
+        axes[i, 1].set_title("Original Mask")
+        axes[i, 1].axis("off")
+
+        # Augmented Image
+        axes[i, 2].imshow(cv2.cvtColor(aug_img, cv2.COLOR_BGR2RGB))
+        axes[i, 2].set_title("Augmented Image")
+        axes[i, 2].axis("off")
+
+        # Augmented Mask
+        axes[i, 3].imshow(aug_mask, cmap="gray")
+        axes[i, 3].set_title("Augmented Mask")
+        axes[i, 3].axis("off")
+
+    plt.tight_layout()
+    plt.show()
+
+# Display 5 Augmented Samples
+display_augmented_samples(df, num_samples=5)
+
+import os
+import numpy as np
+import pandas as pd
+import cv2
+import matplotlib.pyplot as plt
+import seaborn as sns
+import albumentations as A
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.manifold import TSNE
+import umap
+from sklearn.decomposition import PCA
+import random
+
+# Function to apply CLAHE (Contrast Limited Adaptive Histogram Equalization)
+def apply_clahe(image):
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)  # Convert to LAB color space
+    l, a, b = cv2.split(lab)  # Split channels
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l = clahe.apply(l)  # Apply CLAHE on L-channel
+    lab = cv2.merge((l, a, b))  # Merge back
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)  # Convert back to BGR
+
+# Function to apply Histogram Equalization (HE)
+def apply_histogram_equalization(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    equalized = cv2.equalizeHist(gray)  # Apply histogram equalization
+    return cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
+
+# Define Augmentation Pipeline using Albumentations
+augmentation = A.Compose([
+    A.HorizontalFlip(p=0.5),   # Random horizontal flip
+    A.VerticalFlip(p=0.5),     # Random vertical flip
+    A.Rotate(limit=20, p=0.5), # Random rotation
+    A.RandomBrightnessContrast(p=0.3),
+    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.3),  # Elastic Deformation
+    A.OneOf([
+        A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),  # CLAHE
+        A.Equalize(p=0.5)  # Histogram Equalization
+    ], p=0.5)
+])
+
+# Function to augment an image
+def augment_image(image):
+    augmented = augmentation(image=image)
+    return augmented['image']
+
+# Function to visualize preprocessing techniques
+def display_preprocessing_stages(image1, image2):
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    
+    for i, img in enumerate([image1, image2]):
+        clahe_image = apply_clahe(img)
+        hist_eq_image = apply_histogram_equalization(img)
+        augmented_image = augment_image(img)
+
+        titles = ["Original", "CLAHE", "Histogram Equalization", "Augmented"]
+        images = [img, clahe_image, hist_eq_image, augmented_image]
+
+        for j, (ax, img, title) in enumerate(zip(axes[i], images, titles)):
+            ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            ax.set_title(f"Image {i+1} - {title}")
+            ax.axis("off")
+
+    plt.show()
+
+# Function to visualize t-SNE and UMAP
+def visualize_image_distribution(df, method='tsne'):
+    images = np.stack(df['image_pixels'].values)  # Stack images into a single array
+    images_flat = images.reshape(images.shape[0], -1)  # Flatten images
+    images_pca = PCA(n_components=min(50, images_flat.shape[1])).fit_transform(images_flat)  # Reduce dimensions using PCA
+
+    if method == 'tsne':
+        perplexity_value = min(30, images_pca.shape[0] - 1)  # Ensure perplexity < n_samples
+        reducer = TSNE(n_components=2, perplexity=perplexity_value, random_state=42)
+    else:
+        reducer = umap.UMAP(n_components=2, random_state=42)
+
+    images_reduced = reducer.fit_transform(images_pca)
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(images_reduced[:, 0], images_reduced[:, 1], alpha=0.7, cmap='coolwarm')
+    plt.title(f'{method.upper()} Visualization of Image Dataset')
+    plt.xlabel('Component 1')
+    plt.ylabel('Component 2')
+    plt.show()
+
+# --------------------- Select Two Random Images from Dataset ---------------------
+
+# Corrected dataset paths
+image_path = r"E:/Dataset/kidney segmentation dataset/2d segmentation dataset 100/images"
+mask_path = r"E:/Dataset/kidney segmentation dataset/2d segmentation dataset 100/mask"
+image_files = [f for f in os.listdir(image_path) if f.endswith(('.png', '.jpg', '.jpeg'))]
+
+if len(image_files) < 2:
+    raise ValueError("Not enough images found in the specified dataset path. Please check the folder path.")
+
+random_images = random.sample(image_files, 2)
+image1 = cv2.imread(os.path.join(image_path, random_images[0]))
+image2 = cv2.imread(os.path.join(image_path, random_images[1]))
+
+if image1 is None or image2 is None:
+    raise ValueError(f"Failed to load one or both images. Please check the file paths.")
+
+# Display Preprocessing Stages for Two Images
+display_preprocessing_stages(image1, image2)
+
+# Sample DataFrame Creation (Replace with actual image data)
+df = pd.DataFrame({
+    'image_pixels': [np.random.rand(32, 32, 3) for _ in range(50)]  # 50 random images (32x32 RGB)
+})
+
+# Display t-SNE and UMAP Visualizations
+visualize_image_distribution(df, method='tsne')
+visualize_image_distribution(df, method='umap')
+
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+import numpy as np
+
+def create_image_generator(data_frame,
+                           batch_size,
+                           image_color_mode="rgb",
+                           mask_color_mode="grayscale",
+                           image_save_prefix="image",
+                           mask_save_prefix="mask",
+                           save_to_dir=None,
+                           target_size=(256, 256),
+                           seed=1):
+
+    def normalize(img, mask):
+        img = img / 255.0
+        mask = mask / 255.0
+        mask[mask > 0.5] = 1
+        mask[mask <= 0.5] = 0
+        return img, mask
+
+    # Image generator
+    img_datagen = ImageDataGenerator()
+    mask_datagen = ImageDataGenerator()
+
+    # Flow from dataframe (only ONE sample inside)
+    img_gen = img_datagen.flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='img_path',
+        class_mode=None,
+        color_mode=image_color_mode,
+        target_size=target_size,
+        batch_size=batch_size,
+        shuffle=True,
+        seed=seed
+    )
+
+    mask_gen = mask_datagen.flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='mask_path',
+        class_mode=None,
+        color_mode=mask_color_mode,
+        target_size=target_size,
+        batch_size=batch_size,
+        shuffle=True,
+        seed=seed
+    )
+
+    # Combine two generators
+    while True:
+        img = next(img_gen)
+        mask = next(mask_gen)
+        yield normalize(img, mask)
+
+
+# ------------------- Example Usage -------------------
+batch_size = 1   # IMPORTANT since you have only one image
+train_generator = create_image_generator(train_df, batch_size=batch_size)
+val_generator = create_image_generator(val_df, batch_size=batch_size)
+test_generator = create_image_generator(test_df, batch_size=batch_size)
+
+# Get one batch
+x_batch, y_batch = next(train_generator)
+print("Image batch shape:", x_batch.shape)
+print("Mask batch shape:", y_batch.shape)
+EPOCHS = 35        # keep very low, only for checking pipeline
+BATCH_SIZE = 32    # MUST be 1 because dataset has only one sample
+learning_rate = 1e-4
+w, h = 256, 256   # keep same size as generator target_size
+import tensorflow as tf
+from tensorflow.keras import layers, Model, backend as K
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Input, SeparableConv2D, MaxPooling2D, Conv2DTranspose, Concatenate, GroupNormalization
+import os
+from sklearn.model_selection import train_test_split
+
+# -----------------------------
+# GPU / Optimization
+# -----------------------------
+tf.keras.mixed_precision.set_global_policy('float32')  # Disable mixed precision
+tf.config.optimizer.set_jit(True)  # Enable XLA for faster execution
+
+##VHU-Net Model with HRNet -----------------------------
+# IMPORTS
+# -----------------------------
+import os
+import math
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras import layers, Model, backend as K
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Input, SeparableConv2D, MaxPooling2D, Conv2DTranspose, Concatenate, GroupNormalization
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from scipy import stats
+
+# -----------------------------
+# CONFIGURE GPU / OPTIMIZATION
+# -----------------------------
+tf.keras.mixed_precision.set_global_policy('float32')
+tf.config.optimizer.set_jit(True)
+
+# -----------------------------
+# HYPERPARAMETERS
+# -----------------------------
+BATCH_SIZE = 32
+EPOCHS = 35
+IMG_SIZE = (224, 224)
+LEARNING_RATE = 1e-3
+
+# -----------------------------
+# MODEL BLOCKS
+# -----------------------------
+def double_conv(x, n_filters):
+    x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
+    x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
+    x = GroupNormalization(groups=8)(x)
+    return x
+
+def encoder_conv(x, n_filters):
+    x = double_conv(x, n_filters)
+    p = MaxPooling2D((2, 2))(x)
+    return x, p
+
+def decoder(x, skip_connection, n_filters):
+    x = Conv2DTranspose(n_filters, 3, strides=2, padding='same')(x)
+    h_diff = skip_connection.shape[1] - x.shape[1]
+    w_diff = skip_connection.shape[2] - x.shape[2]
+    if h_diff != 0 or w_diff != 0:
+        skip_connection = layers.Cropping2D(((h_diff//2, h_diff - h_diff//2),
+                                             (w_diff//2, w_diff - w_diff//2)))(skip_connection)
+    x = Concatenate()([x, skip_connection])
+    x = double_conv(x, n_filters)
+    return x
+
+def VHU_Net_NoViT_Model(input_shape):
+    inputs = Input(input_shape)
+    s1, p1 = encoder_conv(inputs, 16)
+    s2, p2 = encoder_conv(p1, 32)
+    s3, p3 = encoder_conv(p2, 64)
+    s4, p4 = encoder_conv(p3, 128)
+    b = double_conv(p4, 128)
+    b1 = decoder(b, s4, 64)
+    b2 = decoder(b1, s3, 32)
+    b3 = decoder(b2, s2, 16)
+    b4 = decoder(b3, s1, 8)
+    outputs = SeparableConv2D(1, 1, padding='same', activation='sigmoid')(b4)
+    return Model(inputs, outputs)
+
+# -----------------------------
+# LOSS & METRICS
+# -----------------------------
+def coefficient_dice(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    return (2 * intersection + smooth) / (union + smooth)
+
+def dice_loss(y_true, y_pred):
+    return -coefficient_dice(y_true, y_pred)
+
+def iou(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    return (intersection + smooth) / (union - intersection + smooth)
+
+# -----------------------------
+# DATASET LOADING
+# -----------------------------
+image_dir = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/images"
+mask_dir  = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/masks"
+
+image_files = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)])
+mask_files  = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)])
+
+df = pd.DataFrame({'img_path': image_files, 'mask_path': mask_files})
+
+train_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
+
+# -----------------------------
+# CUSTOM GENERATOR
+# -----------------------------
+def create_generators(data_frame, batch_size, size=(224,224)):
+    img_gen = ImageDataGenerator().flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='img_path',
+        class_mode=None,
+        color_mode='rgb',
+        target_size=size,
+        batch_size=batch_size,
+        seed=1
+    )
+    mask_gen = ImageDataGenerator().flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='mask_path',
+        class_mode=None,
+        color_mode='grayscale',
+        target_size=size,
+        batch_size=batch_size,
+        seed=1
+    )
+    while True:
+        yield next(img_gen), next(mask_gen)
+
+train_gen = create_generators(train_df, BATCH_SIZE, IMG_SIZE)
+val_gen   = create_generators(val_df, BATCH_SIZE, IMG_SIZE)
+
+steps_per_epoch = math.ceil(len(train_df) / BATCH_SIZE)
+val_steps = math.ceil(len(val_df) / BATCH_SIZE)
+
+# -----------------------------
+# MODEL CREATION & COMPILATION
+# -----------------------------
+model = VHU_Net_NoViT_Model((224, 224, 3))
+model.compile(optimizer=Adam(LEARNING_RATE),
+              loss=dice_loss,
+              metrics=[iou, coefficient_dice])
+model.summary()
+
+# -----------------------------
+# TRAINING
+# -----------------------------
+history = model.fit(
+    train_gen,
+    steps_per_epoch=steps_per_epoch,
+    validation_data=val_gen,
+    validation_steps=val_steps,
+    epochs=EPOCHS
+)
+
+# -----------------------------
+# PLOT METRICS
+# -----------------------------
+epochs_range = range(1, EPOCHS + 1)
+plt.figure(figsize=(10,4))
+plt.subplot(1,2,1)
+plt.plot(epochs_range, history.history['coefficient_dice'])
+plt.plot(epochs_range, history.history['val_coefficient_dice'])
+plt.xlabel('Epochs'); plt.ylabel('Dice')
+
+plt.subplot(1,2,2)
+plt.plot(epochs_range, history.history['iou'])
+plt.plot(epochs_range, history.history['val_iou'])
+plt.xlabel('Epochs'); plt.ylabel('IoU')
+plt.show()
+
+# -----------------------------
+# EVALUATE METRICS (MEAN ± SD [95% CI])
+# -----------------------------
+def eval_metrics(model, generator, steps):
+    loss_list, dice_list, iou_list = [], [], []
+
+    for _ in range(steps):
+        imgs, true_masks = next(generator)
+        preds = model.predict(imgs)
+
+        preds_bin = (preds > 0.5).astype(np.float32)
+        true_bin  = (true_masks > 127).astype(np.float32) if true_masks.max() > 1 else (true_masks > 0.5).astype(np.float32)
+
+        for i in range(len(preds_bin)):
+            y_true = true_bin[i,...,0].flatten()
+            y_pred = preds_bin[i,...,0].flatten()
+
+            intersection = np.sum(y_true * y_pred)
+            union = np.sum(y_true) + np.sum(y_pred)
+
+            dice = (2*intersection + 1e-5) / (union + 1e-5)
+            iou  = (intersection + 1e-5) / (union - intersection + 1e-5)
+            loss = -dice
+
+            loss_list.append(loss)
+            dice_list.append(dice)
+            iou_list.append(iou)
+
+    def stats_ci(arr):
+        arr = np.array(arr)
+        mean = np.mean(arr)
+        sd = np.std(arr, ddof=1)
+        ci = stats.t.interval(0.95, len(arr)-1, loc=mean, scale=sd/np.sqrt(len(arr)))
+        return mean, sd, ci
+
+    return {
+        "Loss": stats_ci(loss_list),
+        "Dice": stats_ci(dice_list),
+        "IoU":  stats_ci(iou_list)
+    }
+
+results = eval_metrics(model, val_gen, val_steps)
+
+# Print metrics
+for metric, (mean, sd, ci) in results.items():
+    print(f"{metric}: {mean:.4f} ± {sd:.4f} [95% CI: {ci[0]:.4f} – {ci[1]:.4f}]")
+
+##VHU-Net Model with HRNet -----------------------------
+# IMPORTS
+# -----------------------------
+import os
+import math
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from tensorflow.keras import layers, Model, backend as K
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Input, SeparableConv2D, MaxPooling2D, Conv2DTranspose, Concatenate, GroupNormalization
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from scipy import stats
+
+# -----------------------------
+# CONFIGURE GPU / OPTIMIZATION
+# -----------------------------
+tf.keras.mixed_precision.set_global_policy('float32')
+tf.config.optimizer.set_jit(True)
+
+# -----------------------------
+# HYPERPARAMETERS
+# -----------------------------
+BATCH_SIZE = 32
+EPOCHS = 35
+IMG_SIZE = (224, 224)
+LEARNING_RATE = 1e-3
+
+# Disable Mixed Precision for CPU/GPU compatibility
+tf.keras.mixed_precision.set_global_policy('float32')
+
+# Enable XLA Compilation for faster execution
+tf.config.optimizer.set_jit(True)
+
+# Function to create a Double Convolution Block
+def double_conv(x, n_filters):
+    x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
+    x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
+    x = GroupNormalization(groups=8)(x)
+    return x
+
+# Encoder Block
+def encoder_block(x, n_filters):
+    x = double_conv(x, n_filters)
+    p = MaxPooling2D((2, 2))(x)
+    return x, p
+
+# Decoder Block with Skip Connections
+def decoder_block(x, skip_connection, n_filters):
+    x = Conv2DTranspose(n_filters, 3, strides=2, padding='same')(x)
+    
+    # Adjust skip connection size
+    h_diff = skip_connection.shape[1] - x.shape[1]
+    w_diff = skip_connection.shape[2] - x.shape[2]
+    
+    if h_diff != 0 or w_diff != 0:
+        skip_connection = layers.Cropping2D(((h_diff // 2, h_diff - h_diff // 2),
+                                             (w_diff // 2, w_diff - w_diff // 2)))(skip_connection)
+
+    x = Concatenate()([x, skip_connection])
+    x = double_conv(x, n_filters)
+    return x
+
+# VHU-Net Model without HRNet
+def VHU_Net_No_HRNet(input_shape):
+    inputs = Input(input_shape)
+
+    # Encoder path
+    s1, p1 = encoder_block(inputs, 16)
+    s2, p2 = encoder_block(p1, 32)
+    s3, p3 = encoder_block(p2, 64)
+    s4, p4 = encoder_block(p3, 128)  # Bottleneck
+
+    # Bridge
+    b = double_conv(p4, 128)
+
+    # Decoder path
+    d1 = decoder_block(b, s4, 64)
+    d2 = decoder_block(d1, s3, 32)
+    d3 = decoder_block(d2, s2, 16)
+    d4 = decoder_block(d3, s1, 8)
+
+    # Output Layer
+    outputs = SeparableConv2D(1, 1, padding='same', activation='sigmoid')(d4)
+
+    return Model(inputs, outputs, name='VHU-Net_No_HRNet')
+
+
+# -----------------------------
+# LOSS & METRICS
+# -----------------------------
+def coefficient_dice(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    return (2 * intersection + smooth) / (union + smooth)
+
+def dice_loss(y_true, y_pred):
+    return -coefficient_dice(y_true, y_pred)
+
+def iou(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    return (intersection + smooth) / (union - intersection + smooth)
+
+# -----------------------------
+# DATASET LOADING
+# -----------------------------
+image_dir = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/images"
+mask_dir  = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/masks"
+
+image_files = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)])
+mask_files  = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)])
+
+df = pd.DataFrame({'img_path': image_files, 'mask_path': mask_files})
+
+train_df, val_df = train_test_split(df, test_size=0.2, random_state=42)
+
+# -----------------------------
+# CUSTOM GENERATOR
+# -----------------------------
+def create_generators(data_frame, batch_size, size=(224,224)):
+    img_gen = ImageDataGenerator().flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='img_path',
+        class_mode=None,
+        color_mode='rgb',
+        target_size=size,
+        batch_size=batch_size,
+        seed=1
+    )
+    mask_gen = ImageDataGenerator().flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='mask_path',
+        class_mode=None,
+        color_mode='grayscale',
+        target_size=size,
+        batch_size=batch_size,
+        seed=1
+    )
+    while True:
+        yield next(img_gen), next(mask_gen)
+
+train_gen = create_generators(train_df, BATCH_SIZE, IMG_SIZE)
+val_gen   = create_generators(val_df, BATCH_SIZE, IMG_SIZE)
+
+steps_per_epoch = math.ceil(len(train_df) / BATCH_SIZE)
+val_steps = math.ceil(len(val_df) / BATCH_SIZE)
+
+# -----------------------------
+# MODEL CREATION & COMPILATION
+# -----------------------------
+model = VHU_Net_NoViT_Model((224, 224, 3))
+model.compile(optimizer=Adam(LEARNING_RATE),
+              loss=dice_loss,
+              metrics=[iou, coefficient_dice])
+model.summary()
+
+# -----------------------------
+# TRAINING
+# -----------------------------
+history = model.fit(
+    train_gen,
+    steps_per_epoch=steps_per_epoch,
+    validation_data=val_gen,
+    validation_steps=val_steps,
+    epochs=EPOCHS
+)
+
+# -----------------------------
+# PLOT METRICS
+# -----------------------------
+epochs_range = range(1, EPOCHS + 1)
+plt.figure(figsize=(10,4))
+plt.subplot(1,2,1)
+plt.plot(epochs_range, history.history['coefficient_dice'])
+plt.plot(epochs_range, history.history['val_coefficient_dice'])
+plt.xlabel('Epochs'); plt.ylabel('Dice')
+
+plt.subplot(1,2,2)
+plt.plot(epochs_range, history.history['iou'])
+plt.plot(epochs_range, history.history['val_iou'])
+plt.xlabel('Epochs'); plt.ylabel('IoU')
+plt.show()
+
+# -----------------------------
+# EVALUATE METRICS (MEAN ± SD [95% CI])
+# -----------------------------
+def eval_metrics(model, generator, steps):
+    loss_list, dice_list, iou_list = [], [], []
+
+    for _ in range(steps):
+        imgs, true_masks = next(generator)
+        preds = model.predict(imgs)
+
+        preds_bin = (preds > 0.5).astype(np.float32)
+        true_bin  = (true_masks > 127).astype(np.float32) if true_masks.max() > 1 else (true_masks > 0.5).astype(np.float32)
+
+        for i in range(len(preds_bin)):
+            y_true = true_bin[i,...,0].flatten()
+            y_pred = preds_bin[i,...,0].flatten()
+
+            intersection = np.sum(y_true * y_pred)
+            union = np.sum(y_true) + np.sum(y_pred)
+
+            dice = (2*intersection + 1e-5) / (union + 1e-5)
+            iou  = (intersection + 1e-5) / (union - intersection + 1e-5)
+            loss = -dice
+
+            loss_list.append(loss)
+            dice_list.append(dice)
+            iou_list.append(iou)
+
+    def stats_ci(arr):
+        arr = np.array(arr)
+        mean = np.mean(arr)
+        sd = np.std(arr, ddof=1)
+        ci = stats.t.interval(0.95, len(arr)-1, loc=mean, scale=sd/np.sqrt(len(arr)))
+        return mean, sd, ci
+
+    return {
+        "Loss": stats_ci(loss_list),
+        "Dice": stats_ci(dice_list),
+        "IoU":  stats_ci(iou_list)
+    }
+
+results = eval_metrics(model, val_gen, val_steps)
+
+# Print metrics
+for metric, (mean, sd, ci) in results.items():
+    print(f"{metric}: {mean:.4f} ± {sd:.4f} [95% CI: {ci[0]:.4f} – {ci[1]:.4f}]")
