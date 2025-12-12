@@ -92,10 +92,7 @@ print(f"Test samples: {len(test_df)}")
 
 # Optional: show first 5 rows
 train_df.head()
-#..................Total samples: 1169
-Training samples: 935
-Validation samples: 117
-Test samples: 117.....................#
+
 
 import os
 import pandas as pd
