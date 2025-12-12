@@ -1,4 +1,3 @@
-......................# Kidney segmenation dataset........................
 import os
 os.listdir("/kaggle/input")
 
@@ -23,6 +22,10 @@ print("Total masks:", len(mask_files))
 # If you want them in a tuple like before
 counts = (len(image_files), len(mask_files))
 print("Counts (images, masks):", counts)
+
+#..................Total images: 2027
+Total masks: 2027
+Counts (images, masks): (2027, 2027)................#
 
 import os
 import pandas as pd
@@ -72,6 +75,7 @@ print(f"Test samples: {len(test_df)}")
 
 # Optional: show first 5 entries
 train_df.head()
+
 
 import os
 import pandas as pd
@@ -383,6 +387,7 @@ print("Training set size:", len(train_df))
 print("Validation set size:", len(val_df))
 print("Test set size:", len(test_df))
 
+
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 
@@ -447,12 +452,12 @@ test_generator = create_image_generator(test_df, batch_size=batch_size)
 x_batch, y_batch = next(train_generator)
 print("Image batch shape:", x_batch.shape)
 print("Mask batch shape:", y_batch.shape)
-
 EPOCHS = 35        # keep very low, only for checking pipeline
 BATCH_SIZE = 32    # MUST be 1 because dataset has only one sample
 learning_rate = 1e-4
 w, h = 256, 256   # keep same size as generator target_sizeEPOCHS = 35        # keep very low, only for checking pipeline
 
+#....Transformer enhanced U-Net model..........#
 import tensorflow as tf
 from tensorflow.keras import layers, Model, backend as K
 from tensorflow.keras.optimizers import Adam
@@ -465,6 +470,7 @@ from sklearn.model_selection import train_test_split
 # -----------------------------
 tf.keras.mixed_precision.set_global_policy('float32')  # Disable mixed precision
 tf.config.optimizer.set_jit(True)  # Enable XLA for faster execution
+
 def double_conv(x, n_filters):
     x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
     x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
@@ -502,6 +508,7 @@ def VHU_Net_Model(input_shape=(224,224,3)):
     b4 = decoder(b3,s1,8)
     outputs = SeparableConv2D(1,1,padding='same',activation='sigmoid')(b4)
     return Model(inputs,outputs)
+
 def dice_coefficient(y_true,y_pred,smooth=1e-5):
     y_true = K.flatten(y_true)
     y_pred = K.flatten(y_pred)
@@ -547,7 +554,6 @@ def safe_assd(y_true, y_pred):
     if y_true.sum() == 0 or y_pred.sum() == 0:
         return np.nan
     return assd_np(y_true, y_pred)
-
 def load_image_mask(image_path, mask_path, img_size=(224,224)):
     image = tf.io.read_file(image_path)
     image = tf.image.decode_png(image, channels=3)
@@ -591,7 +597,6 @@ model.compile(
     steps_per_execution=5,
     jit_compile=True
 )
-
 EPOCHS = 35
 
 history = model.fit(
@@ -687,7 +692,7 @@ for cls in ["kidney", "tumor"]:
 mean_loss, sd_loss, ci_loss = summary_stats(results["loss"])
 print(f"\n💥 LOSS: {mean_loss:.4f} ± {sd_loss:.4f} (95% CI: {ci_loss[0]:.4f} – {ci_loss[1]:.4f})")
 print("\n✅ Evaluation complete.")
-
+print(history.history.keys())
 import matplotlib.pyplot as plt
 
   # ---------------- Kidney Segmentation Visualization ----------------
@@ -740,7 +745,11 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+#........Figure 12, Table 6 VHU_Net.......#
 
+
+
+#...........ConD-PDN Model.........#
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Input
 from tensorflow.keras.layers import Conv2D, GlobalAveragePooling2D, Reshape, Multiply
@@ -826,7 +835,6 @@ optim = Adam(learning_rate=learning_rate)
 # Compile the model
 model.compile(optimizer=optim, loss=Dice_loss, metrics=[Iou, Coffiecient_dice])
 model.summary()
-
 import tensorflow as tf
 from tensorflow.keras import backend as K
 
@@ -998,10 +1006,6 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-import os
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
 
 # Function to load and preprocess a single image and mask
 def load_mask_and_tumor(image_path, mask_path, image_size=(256, 256)):
@@ -1088,74 +1092,16 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+#......Figure 13, Table 6: ConD-PDN........#
 
+
+
+
+
+#..........fuse ConD-PDN and VHU-Net.....#
 import tensorflow as tf
 from tensorflow.keras import layers, Model, Input
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras import backend as K
-
-def fusion_net(input_shape=(256, 256, 1)):
-    inputs = Input(input_shape)
-    conv = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
-    conv = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(conv)
-    output = layers.Conv2D(1, (1, 1), activation='sigmoid', padding='same')(conv)
-    return Model(inputs=inputs, outputs=output, name="Fusion_Net")
-
-# Function to fuse ConD-PDN and VHU-Net
-
-def fuse_models(cond_pdn_model, vhu_net_model, input_shape=(256, 256, 1)):
-    inputs = Input(input_shape)
-    
-    # Get outputs from both models
-    cond_pdn_output = cond_pdn_model(inputs)
-    vhu_net_output = vhu_net_model(inputs)
-    
-    # Fusion step: Averaging outputs
-    fused_output = layers.Average()([cond_pdn_output, vhu_net_output])
-    
-    # Final output layer
-    final_output = layers.Conv2D(1, (1, 1), activation='sigmoid', padding='same')(fused_output)
-    
-    return Model(inputs, final_output, name="Fused_ConD_VHU_Net")
-
-# Instantiate models
-input_shape = (256, 256, 1)
-cond_pdn_model = cond_pdn(input_shape)
-vhu_net_model = VHU_Net_Model(input_shape)
-
-# Fuse the models
-fused_model = fuse_models(cond_pdn_model, vhu_net_model, input_shape)
-
-# Define Dice Loss and IoU
-
-def Coffiecient_dice(y_true, y_pred, smooth=100):
-    y_true = K.flatten(y_true)
-    y_pred = K.flatten(y_pred)
-    intersection = K.sum(y_true * y_pred)
-    union = K.sum(y_true) + K.sum(y_pred)
-    dice = (2 * intersection + smooth) / (union + smooth)
-    return dice
-
-def Dice_loss(y_true, y_pred):
-    return -Coffiecient_dice(y_true, y_pred)
-
-def Iou(y_true, y_pred, smooth=100):
-    y_true = K.flatten(y_true)
-    y_pred = K.flatten(y_pred)
-    intersection = K.sum(y_pred * y_true)
-    union = K.sum(y_true) + K.sum(y_pred)  
-    iou = (intersection + smooth) / (union - intersection + smooth)
-    return iou
-
-# Compile fused model
-learning_rate = 1e-3  
-optim = Adam(learning_rate=learning_rate)
-fused_model.compile(optimizer=optim, loss=Dice_loss, metrics=[Iou, Coffiecient_dice])
-
-# Print model summary
-fused_model.summary()
-import tensorflow as tf
-from tensorflow.keras import layers, Model, Input
+from sklearn.metrics import confusion_matrix
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import backend as K
 
@@ -1287,6 +1233,7 @@ def create_image_generator(data_frame, batch_size, image_color_mode, mask_color_
     )
 
     return img_gen, mask_gen
+
 EPOCHS = 35
 
 history = model.fit(
@@ -1382,6 +1329,8 @@ for cls in ["kidney", "tumor"]:
 mean_loss, sd_loss, ci_loss = summary_stats(results["loss"])
 print(f"\n💥 LOSS: {mean_loss:.4f} ± {sd_loss:.4f} (95% CI: {ci_loss[0]:.4f} – {ci_loss[1]:.4f})")
 print("\n✅ Evaluation complete.")
+print(history.history.keys())
+
 import matplotlib.pyplot as plt
 
 import os
@@ -1461,4 +1410,111 @@ plt.legend()
 
 plt.tight_layout()
 plt.show()
+#...........Figure 14, Table 6: Fuse_Models result.....#
 
+# ------------------------------
+# CELL: CONFUSION MATRIX
+# ------------------------------
+import numpy as np
+from sklearn.metrics import confusion_matrix
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def get_confusion_matrix(model, dataset):
+    y_true_list = []
+    y_pred_list = []
+
+    print("Generating predictions for confusion matrix...")
+
+    # Loop through TF dataset
+    for imgs, masks in dataset:
+        preds = model.predict(imgs)
+
+        # Threshold to binary
+        preds_bin = (preds > 0.5).astype(np.uint8)
+        masks_bin = (masks.numpy() > 0.5).astype(np.uint8)
+
+        # Flatten and store
+        y_true_list.append(masks_bin.flatten())
+        y_pred_list.append(preds_bin.flatten())
+
+    # Combine all batches
+    y_true = np.concatenate(y_true_list)
+    y_pred = np.concatenate(y_pred_list)
+
+    # Compute confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+
+    # Plot
+    plt.figure(figsize=(5,4))
+    sns.heatmap(
+        cm,
+        annot=True,
+        fmt='d',
+        cmap="Blues",
+        xticklabels=["Background", "Foreground"],
+        yticklabels=["Background", "Foreground"]
+    )
+    plt.xlabel("Predicted")
+    plt.ylabel("True")
+    plt.title("Segmentation Confusion Matrix")
+    plt.show()
+
+    return cm
+
+# ---- RUN THE CONFUSION MATRIX ----
+cm = get_confusion_matrix(model, test_ds)
+print("Confusion matrix:\n", cm)
+
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# -------------------------------------
+# LOAD IMAGE
+# -------------------------------------
+img_path = r"C:\Users\DELL\Desktop\VHSCU_Net\fused image.PNG"
+original = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+
+if original is None:
+    print("Image not found. Check path:", img_path)
+    raise SystemExit
+
+# -------------------------------------
+# NORMAL HEATMAP (NO MODEL)
+# -------------------------------------
+# Scale to 0-255
+norm_img = cv2.normalize(original, None, 0, 255, cv2.NORM_MINMAX)
+norm_img = np.uint8(norm_img)
+
+# Apply heatmap
+heatmap = cv2.applyColorMap(norm_img, cv2.COLORMAP_JET)
+
+# Overlay = 60% original + 40% heatmap
+overlay = cv2.addWeighted(cv2.cvtColor(original, cv2.COLOR_GRAY2BGR), 
+                          0.6, heatmap, 0.4, 0)
+
+# -------------------------------------
+# DISPLAY RESULTS
+# -------------------------------------
+plt.figure(figsize=(12,4))
+
+plt.subplot(1,3,1)
+plt.title("Fused (Kidney + Tumor)")
+plt.imshow(original, cmap='gray')
+plt.axis("off")
+
+plt.subplot(1,3,2)
+plt.title("Heatmap")
+plt.imshow(heatmap)
+plt.axis("off")
+
+plt.subplot(1,3,3)
+plt.title("Overlay (Image + Heatmap)")
+plt.imshow(overlay)
+plt.axis("off")
+
+plt.tight_layout()
+plt.show()
+#........Table 7: Confusion matrices and heatmaps  result ........#
