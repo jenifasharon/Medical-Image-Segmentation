@@ -1,0 +1,1392 @@
+import os
+os.listdir("/kaggle/input")
+
+import os
+
+# Paths
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+not_aug_folder = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+# Count images
+num_aug_images = len([f for f in os.listdir(aug_folder) if f.endswith((".png", ".jpg"))])
+num_not_aug_images = len([f for f in os.listdir(not_aug_folder) if f.endswith((".png", ".jpg"))])
+
+print("Number of images in Augmented dataset:", num_aug_images)
+print("Number of images in Non-augmented dataset:", num_not_aug_images)
+
+# Total
+print("Total images:", num_aug_images + num_not_aug_images)
+#.............Number of images in Augmented dataset: 39080
+Number of images in Non-augmented dataset: 7816
+Total images: 46896.............................#
+
+import os
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# ==============================
+# Dataset directories
+# ==============================
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+not_aug_folder = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+# ==============================
+# Collect image file paths
+# ==============================
+aug_images = sorted([
+    os.path.join(aug_folder, f)
+    for f in os.listdir(aug_folder)
+    if f.lower().endswith((".png", ".jpg", ".jpeg"))
+])
+
+not_aug_images = sorted([
+    os.path.join(not_aug_folder, f)
+    for f in os.listdir(not_aug_folder)
+    if f.lower().endswith((".png", ".jpg", ".jpeg"))
+])
+
+# Count images
+print("Augmented images:", len(aug_images))
+print("Non-augmented images:", len(not_aug_images))
+print("Total images:", len(aug_images) + len(not_aug_images))
+
+# ==============================
+# Create dataframe
+# ==============================
+df = pd.DataFrame({
+    "img_path": aug_images + not_aug_images
+})
+
+# ==============================
+# Split dataset: 8:1:1
+# ==============================
+train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42, shuffle=True)
+val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42, shuffle=True)
+
+train_df = train_df.reset_index(drop=True)
+val_df = val_df.reset_index(drop=True)
+test_df = test_df.reset_index(drop=True)
+
+# ==============================
+# Summary
+# ==============================
+print("Total samples:", len(df))
+print("Training samples:", len(train_df))
+print("Validation samples:", len(val_df))
+print("Test samples:", len(test_df))
+
+# Show first 5 entries
+train_df.head()
+#..............Augmented images: 39080
+Non-augmented images: 7816
+Total images: 46896
+Total samples: 46896
+Training samples: 37516
+Validation samples: 4690
+Test samples: 4690..............#
+
+import os
+import pandas as pd
+
+def create_df(image_dir, mask_dir):
+    img_paths = []
+    mask_paths = []
+    
+    # Ensure directories exist
+    if not os.path.exists(image_dir) or not os.path.exists(mask_dir):
+        raise ValueError("The specified directories do not exist.")
+    
+    # Get sorted lists of images and masks
+    image_files = sorted(os.listdir(image_dir))
+    mask_files = sorted(os.listdir(mask_dir))
+
+    # Ensure matching images and masks
+    for img_file, mask_file in zip(image_files, mask_files):
+        img_path = os.path.join(image_dir, img_file)
+        mask_path = os.path.join(mask_dir, mask_file)
+        img_paths.append(img_path)
+        mask_paths.append(mask_path)
+
+    # Create DataFrame
+    df = pd.DataFrame({'img_path': img_paths, 'mask_path': mask_paths})
+    return df
+
+
+# ===========================
+#   UPDATED PATHS FOR KITS23
+# ===========================
+
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+not_aug_folder = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+# Create DataFrame for kits23-style dataset
+df = create_df(aug_folder, not_aug_folder)
+
+# Show sample rows
+print(df.head())
+
+# Total count
+print("Total images:", len(df))
+print("Total masks:", len(df))
+
+
+
+import os
+import numpy as np
+import cv2
+import pandas as pd
+
+def create_df(image_dir, mask_dir):
+    img_paths = []
+    mask_paths = []
+    
+    # Ensure directories exist
+    if not os.path.exists(image_dir) or not os.path.exists(mask_dir):
+        raise ValueError("The specified directories do not exist.")
+    
+    # Get sorted lists of images and masks
+    image_files = sorted(os.listdir(image_dir))
+    mask_files = sorted(os.listdir(mask_dir))
+
+    # Ensure matching images and masks
+    for img_file, mask_file in zip(image_files, mask_files):
+        img_path = os.path.join(image_dir, img_file)
+        mask_path = os.path.join(mask_dir, mask_file)
+        img_paths.append(img_path)
+        mask_paths.append(mask_path)
+
+    df = pd.DataFrame({'img_path': img_paths, 'mask_path': mask_paths})
+    return df
+
+
+# ===========================================
+# UPDATED KITS23-STYLE FOLDER PATHS
+# ===========================================
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+not_aug_folder = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+# Create DataFrame
+df = create_df(aug_folder, not_aug_folder)
+
+
+
+# ===========================================
+# FUNCTION TO DISPLAY IMAGE/MASK SHAPES
+# ===========================================
+def display_image_shapes(df, num_samples=10):
+    num_samples = min(num_samples, len(df))  
+
+    random_indices = np.random.choice(df.index, size=num_samples, replace=False)
+    random_images = df.iloc[random_indices]['img_path'].values
+    random_masks = df.iloc[random_indices]['mask_path'].values
+
+    for i in range(num_samples):
+        image = cv2.imread(random_images[i])
+        mask = cv2.imread(random_masks[i], cv2.IMREAD_GRAYSCALE)
+
+        if image is None or mask is None:
+            print(f"Warning: Unable to load image or mask at index {random_indices[i]}")
+            continue
+
+        print(f"Sample {i+1}: Image Shape = {image.shape}, Mask Shape = {mask.shape}")
+
+
+
+# ===========================================
+# RUN SHAPE CHECK
+# ===========================================
+display_image_shapes(df)
+
+
+import os
+import pandas as pd
+
+# ---- PATHS ----
+image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+mask_dir  = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+print("Images folder exists:", os.path.exists(image_dir))
+print("Masks folder exists:", os.path.exists(mask_dir))
+
+# ---- Show folder contents ----
+print("\n========== IMAGE FILES (first 30) ==========")
+img_files = os.listdir(image_dir)
+print(img_files[:30])
+print("Total images:", len(img_files))
+
+print("\n========== MASK FILES (first 30) ==========")
+mask_files = os.listdir(mask_dir)
+print(mask_files[:30])
+print("Total masks:", len(mask_files))
+
+# ---- Auto-detect matching pattern ----
+def auto_match(image_list, mask_list):
+    matches = []
+    for img in image_list:
+        name = os.path.splitext(img)[0]
+
+        # Try 3 matching patterns
+        candidates = [
+            img,                 # exact match
+            name + ".png",
+            name + ".jpg",
+            name + ".jpeg",
+            name.replace("_aug", "") + ".png",
+            name.replace("_aug", "") + ".jpg",
+            name.replace("_aug", "") + ".jpeg",
+        ]
+
+        for c in candidates:
+            if c in mask_list:
+                matches.append((img, c))
+                break
+    return matches
+
+pairs = auto_match(img_files, mask_files)
+
+print("\n========== DETECTED MATCHES ==========")
+print("Matched pairs:", len(pairs))
+print(pairs[:10])  # show samples
+
+# ---- Create DataFrame ----
+df = pd.DataFrame({
+    "img_path": [os.path.join(image_dir, p[0]) for p in pairs],
+    "mask_path": [os.path.join(mask_dir, p[1]) for p in pairs]
+})
+
+print("\n========== FINAL DATAFRAME ==========")
+print(df.head())
+print("Total matched image-mask pairs:", len(df))
+#......................................Images folder exists: True
+Masks folder exists: True
+
+========== IMAGE FILES (first 30) ==========
+['slice_case_00053_191_aug1.jpg', 'slice_case_00082_61_aug2.jpg', 'slice_case_00095_78_aug2.jpg', 'slice_case_00063_201_orig.jpg', 'slice_case_00012_13_aug3.jpg', 'slice_case_00086_69_aug0.jpg', 'slice_case_00037_24_aug2.jpg', 'slice_case_00042_174_orig.jpg', 'slice_case_00027_457_aug0.jpg', 'slice_case_00009_32_aug2.jpg', 'slice_case_00027_419_orig.jpg', 'slice_case_00022_353_orig.jpg', 'slice_case_00026_194_orig.jpg', 'slice_case_00000_235_aug0.jpg', 'slice_case_00052_221_aug3.jpg', 'slice_case_00093_427_aug0.jpg', 'slice_case_00046_33_aug1.jpg', 'slice_case_00093_254_aug0.jpg', 'slice_case_00048_24_aug1.jpg', 'slice_case_00036_42_aug0.jpg', 'slice_case_00068_210_aug3.jpg', 'slice_case_00005_453_orig.jpg', 'slice_case_00008_123_aug0.jpg', 'slice_case_00005_417_orig.jpg', 'slice_case_00093_350_aug3.jpg', 'slice_case_00049_267_aug0.jpg', 'slice_case_00002_111_aug1.jpg', 'slice_case_00099_32_orig.jpg', 'slice_case_00063_123_aug2.jpg', 'slice_case_00003_180_orig.jpg']
+Total images: 39080
+
+========== MASK FILES (first 30) ==========
+['slice_case_00089_22.png', 'slice_case_00059_280.png', 'slice_case_00008_144.png', 'slice_case_00095_93.png', 'slice_case_00080_29.png', 'slice_case_00091_296.png', 'slice_case_00095_115.png', 'slice_case_00068_231.png', 'slice_case_00063_151.png', 'slice_case_00025_75.png', 'slice_case_00004_48.png', 'slice_case_00044_44.png', 'slice_case_00078_186.png', 'slice_case_00014_157.png', 'slice_case_00087_33.png', 'slice_case_00053_162.png', 'slice_case_00026_183.png', 'slice_case_00091_185.png', 'slice_case_00091_137.png', 'slice_case_00027_313.png', 'slice_case_00063_188.png', 'slice_case_00022_313.png', 'slice_case_00067_116.png', 'slice_case_00082_33.png', 'slice_case_00059_392.png', 'slice_case_00040_99.png', 'slice_case_00040_94.png', 'slice_case_00052_127.png', 'slice_case_00083_90.png', 'slice_case_00003_207.png']
+Total masks: 7816
+
+========== DETECTED MATCHES ==========
+Matched pairs: 4
+[('slice_case_00061_2_aug1.jpg', 'slice_case_00061_21.png'), ('slice_case_00061_2_aug3.jpg', 'slice_case_00061_23.png'), ('slice_case_00061_2_aug2.jpg', 'slice_case_00061_22.png'), ('slice_case_00061_2_aug0.jpg', 'slice_case_00061_20.png')]
+
+========== FINAL DATAFRAME ==========
+                                            img_path  \
+0  /kaggle/input/sample/AUGMENTED/DATASET_FINAL/J...   
+1  /kaggle/input/sample/AUGMENTED/DATASET_FINAL/J...   
+2  /kaggle/input/sample/AUGMENTED/DATASET_FINAL/J...   
+3  /kaggle/input/sample/AUGMENTED/DATASET_FINAL/J...   
+
+                                           mask_path  
+0  /kaggle/input/sample/NOT-AUGMENTED/DATASET_FIN...  
+1  /kaggle/input/sample/NOT-AUGMENTED/DATASET_FIN...  
+2  /kaggle/input/sample/NOT-AUGMENTED/DATASET_FIN...  
+3  /kaggle/input/sample/NOT-AUGMENTED/DATASET_FIN...  
+Total matched image-mask pairs: 4......................................#
+
+import os
+import cv2
+import matplotlib.pyplot as plt
+import random
+
+# ---- Paths ----
+image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+mask_dir  = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+# ---- List files ----
+image_files = os.listdir(image_dir)
+mask_files = os.listdir(mask_dir)
+
+print("Total images:", len(image_files))
+print("Total masks:", len(mask_files))
+
+# ---- Function to find mask for an image ----
+def find_mask_for_image(img_name, mask_list):
+    # Extract case number and slice id from image
+    # Example: slice_case_00053_191_aug1.jpg -> slice_case_00053_191
+    parts = img_name.split("_")
+    case_slice = "_".join(parts[:4]) if parts[3].startswith("aug") or parts[3].startswith("orig") else "_".join(parts[:3])
+    
+    # Check masks that start with same case_slice
+    for mask in mask_list:
+        if mask.startswith(case_slice):
+            return mask
+    return None
+
+# ---- Pick 5 random images ----
+random_images = random.sample(image_files, 5)
+
+fig, axes = plt.subplots(len(random_images), 2, figsize=(10, len(random_images)*5))
+
+for i, img_name in enumerate(random_images):
+    img_path = os.path.join(image_dir, img_name)
+    mask_name = find_mask_for_image(img_name, mask_files)
+    
+    # Load image
+    img = cv2.imread(img_path)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # Load mask if found
+    if mask_name:
+        mask = cv2.imread(os.path.join(mask_dir, mask_name), cv2.IMREAD_GRAYSCALE)
+    else:
+        mask = None
+    
+    axes[i, 0].imshow(img_rgb)
+    axes[i, 0].set_title(f"Image: {img_name}")
+    axes[i, 0].axis("off")
+    
+    if mask is not None:
+        axes[i, 1].imshow(mask, cmap="gray")
+        axes[i, 1].set_title(f"Mask: {mask_name}")
+    else:
+        axes[i, 1].text(0.5, 0.5, 'No mask found', horizontalalignment='center', verticalalignment='center')
+    axes[i, 1].axis("off")
+
+plt.tight_layout()
+plt.show()
+
+import os
+import numpy as np
+import pandas as pd
+import cv2
+import matplotlib.pyplot as plt
+import seaborn as sns
+import albumentations as A
+from sklearn.manifold import TSNE
+import umap
+from sklearn.decomposition import PCA
+import random
+
+# --- Step 1: Preprocessing functions ---
+def apply_clahe(image):
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    l = clahe.apply(l)
+    lab = cv2.merge((l, a, b))
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+def apply_histogram_equalization(image):
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    equalized = cv2.equalizeHist(gray)
+    return cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
+
+# --- Step 2: Augmentation pipeline ---
+augmentation = A.Compose([
+    A.HorizontalFlip(p=0.5),
+    A.VerticalFlip(p=0.5),
+    A.Rotate(limit=20, p=0.5),
+    A.RandomBrightnessContrast(p=0.3),
+    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.3),
+    A.OneOf([
+        A.CLAHE(clip_limit=2.0, tile_grid_size=(8, 8), p=0.5),
+        A.Equalize(p=0.5)
+    ], p=0.5)
+])
+
+def augment_image(image):
+    return augmentation(image=image)['image']
+
+# --- Step 3: Display preprocessing stages ---
+def display_preprocessing_stages(image1, image2):
+    fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+    for i, img in enumerate([image1, image2]):
+        clahe_image = apply_clahe(img)
+        hist_eq_image = apply_histogram_equalization(img)
+        augmented_image = augment_image(img)
+
+        titles = ["Original", "CLAHE", "Histogram Equalization", "Augmented"]
+        images = [img, clahe_image, hist_eq_image, augmented_image]
+
+        for j, (ax, img_, title) in enumerate(zip(axes[i], images, titles)):
+            ax.imshow(cv2.cvtColor(img_, cv2.COLOR_BGR2RGB))
+            ax.set_title(f"Image {i+1} - {title}")
+            ax.axis("off")
+    plt.show()
+
+# --- Step 4: t-SNE and UMAP visualization ---
+def visualize_image_distribution(df, method='tsne'):
+    images = np.stack(df['image_pixels'].values)
+    images_flat = images.reshape(images.shape[0], -1)
+    images_pca = PCA(n_components=min(50, images_flat.shape[1])).fit_transform(images_flat)
+
+    if method == 'tsne':
+        perplexity_value = min(30, images_pca.shape[0] - 1)
+        reducer = TSNE(n_components=2, perplexity=perplexity_value, random_state=42)
+    else:
+        reducer = umap.UMAP(n_components=2, random_state=42)
+
+    images_reduced = reducer.fit_transform(images_pca)
+    plt.figure(figsize=(8, 6))
+    plt.scatter(images_reduced[:, 0], images_reduced[:, 1], alpha=0.7, cmap='coolwarm')
+    plt.title(f'{method.upper()} Visualization of Image Dataset')
+    plt.xlabel('Component 1')
+    plt.ylabel('Component 2')
+    plt.show()
+
+# --- Step 5: Select two random images from your AUGMENTED folder ---
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+image_files = [f for f in os.listdir(aug_folder) if f.endswith(('.png', '.jpg', '.jpeg'))]
+
+if len(image_files) < 2:
+    raise ValueError("Not enough images found in the specified dataset path.")
+
+random_images = random.sample(image_files, 2)
+image1 = cv2.imread(os.path.join(aug_folder, random_images[0]))
+image2 = cv2.imread(os.path.join(aug_folder, random_images[1]))
+
+if image1 is None or image2 is None:
+    raise ValueError("Failed to load one or both images.")
+
+# Display preprocessing stages
+display_preprocessing_stages(image1, image2)
+
+# --- Step 6: Sample DataFrame for t-SNE/UMAP ---
+# Using random resized images as placeholder for visualization
+df = pd.DataFrame({
+    'image_pixels': [cv2.resize(cv2.imread(os.path.join(aug_folder, f)), (32,32)) for f in random.sample(image_files, 50)]
+})
+
+visualize_image_distribution(df, method='tsne')
+visualize_image_distribution(df, method='umap')
+
+
+import os
+import pandas as pd
+
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+not_aug_folder = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+image_files = sorted([os.path.join(aug_folder, f) for f in os.listdir(aug_folder)])
+mask_files  = sorted([os.path.join(not_aug_folder, f) for f in os.listdir(not_aug_folder)])
+
+print("Images:", len(image_files))
+print("Masks:", len(mask_files))
+
+# Just pair images with masks cyclically
+pairs = [(image_files[i], mask_files[i % len(mask_files)]) for i in range(len(image_files))]
+df = pd.DataFrame(pairs, columns=['img_path', 'mask_path'])
+print("DataFrame size:", len(df))
+
+from sklearn.model_selection import train_test_split
+
+train_df, test_df = train_test_split(df, test_size=0.1, random_state=42)
+train_df, val_df = train_test_split(train_df, test_size=0.1, random_state=42)
+
+print("Train size:", len(train_df))
+print("Val size:", len(val_df))
+print("Test size:", len(test_df))
+#.....................Train size: 31654
+Val size: 3518
+Test size: 3908..........#
+
+#................VHU_Net_Model....................#
+EPOCHS = 35        # keep very low, only for checking pipeline
+BATCH_SIZE = 32    # MUST be 1 because dataset has only one sample
+learning_rate = 1e-4
+w, h = 256, 256   # keep same size as generator target_size
+
+import tensorflow as tf
+from tensorflow.keras import layers, Model, backend as K
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Input, SeparableConv2D, MaxPooling2D, Conv2DTranspose, Concatenate, GroupNormalization
+import os
+from sklearn.model_selection import train_test_split
+
+# -----------------------------
+# GPU / Optimization
+# -----------------------------
+tf.keras.mixed_precision.set_global_policy('float32')  # Disable mixed precision
+tf.config.optimizer.set_jit(True)  # Enable XLA for faster execution
+def double_conv(x, n_filters):
+    x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
+    x = SeparableConv2D(n_filters, 3, padding='same', activation='relu')(x)
+    x = GroupNormalization(groups=8)(x)
+    return x
+
+def encoder_vit(x, n_filters):
+    x = double_conv(x, n_filters)
+    p = MaxPooling2D((2,2))(x)
+    return x, p
+
+def decoder(x, skip_connection, n_filters):
+    x = Conv2DTranspose(n_filters, 3, strides=2, padding='same')(x)
+    h_diff = skip_connection.shape[1] - x.shape[1]
+    w_diff = skip_connection.shape[2] - x.shape[2]
+    if h_diff != 0 or w_diff != 0:
+        skip_connection = layers.Cropping2D(
+            ((h_diff//2, h_diff-h_diff//2),
+             (w_diff//2, w_diff-w_diff//2))
+        )(skip_connection)
+    x = Concatenate()([x, skip_connection])
+    x = double_conv(x, n_filters)
+    return x
+
+def VHU_Net_Model(input_shape=(224,224,3)):
+    inputs = Input(input_shape)
+    s1,p1 = encoder_vit(inputs,16)
+    s2,p2 = encoder_vit(p1,32)
+    s3,p3 = encoder_vit(p2,64)
+    s4,p4 = encoder_vit(p3,128)
+    b = double_conv(p4,128)
+    b1 = decoder(b,s4,64)
+    b2 = decoder(b1,s3,32)
+    b3 = decoder(b2,s2,16)
+    b4 = decoder(b3,s1,8)
+    outputs = SeparableConv2D(1,1,padding='same',activation='sigmoid')(b4)
+    return Model(inputs,outputs)
+def dice_coefficient(y_true,y_pred,smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true*y_pred)
+    union = K.sum(y_true)+K.sum(y_pred)
+    return (2*intersection + smooth)/(union + smooth)
+
+def dice_loss(y_true,y_pred):
+    return -dice_coefficient(y_true,y_pred)
+
+def iou(y_true,y_pred,smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true*y_pred)
+    union = K.sum(y_true)+K.sum(y_pred)
+    return (intersection + smooth)/(union - intersection + smooth)
+def dice_np(y_true, y_pred, smooth=1e-6):
+    y_true_f = y_true.flatten()
+    y_pred_f = y_pred.flatten()
+    intersection = np.sum(y_true_f * y_pred_f)
+    return (2 * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+
+def iou_np(y_true, y_pred, smooth=1e-6):
+    y_true_f = y_true.flatten()
+    y_pred_f = y_pred.flatten()
+    intersection = np.sum(y_true_f * y_pred_f)
+    union = np.sum(y_true_f) + np.sum(y_pred_f) - intersection
+    return (intersection + smooth) / (union + smooth)
+
+!pip install medpy
+from medpy.metric.binary import hd95, assd
+
+def hd95_np(y_true, y_pred):
+    return hd95(y_pred, y_true)
+
+def assd_np(y_true, y_pred):
+    return assd(y_pred, y_true)
+def safe_hd95(y_true, y_pred):
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return hd95_np(y_true, y_pred)
+
+def safe_assd(y_true, y_pred):
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return assd_np(y_true, y_pred)
+
+# ### Fix: Match images and masks by filename
+
+import os
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+
+# --- Step 1: Match images & masks by filename ---
+def match_images_masks(image_dir, mask_dir):
+    image_files = sorted(os.listdir(image_dir))
+    mask_files = sorted(os.listdir(mask_dir))
+    
+    matched_images = []
+    matched_masks = []
+    
+    for img in image_files:
+        img_name = os.path.splitext(img)[0].replace('_aug', '').replace('_orig','')
+        # find mask starting with same base name
+        mask_match = [m for m in mask_files if os.path.splitext(m)[0].startswith(img_name)]
+        if mask_match:
+            matched_images.append(os.path.join(image_dir, img))
+            matched_masks.append(os.path.join(mask_dir, mask_match[0]))
+    
+    print("Matched images:", len(matched_images))
+    print("Matched masks:", len(matched_masks))
+    return matched_images, matched_masks
+
+# --- Step 2: Load and preprocess images & masks ---
+def load_image_mask(image_path, mask_path, img_size=(224,224)):
+    image = tf.io.read_file(image_path)
+    image = tf.image.decode_png(image, channels=3)
+    image = tf.image.resize(image, img_size)
+    image = tf.cast(image, tf.float32)/255.0
+    
+    mask = tf.io.read_file(mask_path)
+    mask = tf.image.decode_png(mask, channels=1)
+    mask = tf.image.resize(mask, img_size)
+    mask = tf.cast(mask, tf.float32)/255.0
+    mask = tf.where(mask>0.5,1.0,0.0)  # Ensure binary mask
+    return image, mask
+
+# --- Step 3: Create tf.data datasets ---
+def create_dataset(image_paths, mask_paths, batch_size=8, img_size=(224,224)):
+    # Split into train/val/test
+    train_img, val_img, train_mask, val_mask = train_test_split(
+        image_paths, mask_paths, test_size=0.2, random_state=42
+    )
+    val_img, test_img, val_mask, test_mask = train_test_split(
+        val_img, val_mask, test_size=0.5, random_state=42
+    )
+    
+    def tf_dataset(images, masks):
+        ds = tf.data.Dataset.from_tensor_slices((images, masks))
+        ds = ds.map(lambda x,y: load_image_mask(x,y,img_size), num_parallel_calls=tf.data.AUTOTUNE)
+        ds = ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
+        return ds
+    
+    return tf_dataset(train_img, train_mask), tf_dataset(val_img, val_mask), tf_dataset(test_img, test_mask)
+
+# --- Step 4: Set dataset paths ---
+aug_folder = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+not_aug_folder = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+# --- Step 5: Match images and masks ---
+image_paths, mask_paths = match_images_masks(aug_folder, not_aug_folder)
+
+# --- Step 6: Load datasets ---
+train_ds, val_ds, test_ds = create_dataset(image_paths, mask_paths, batch_size=8)
+
+# --- Step 7: Check one batch ---
+for x, y in train_ds.take(1):
+    print("Image batch shape:", x.shape)
+    print("Mask batch shape:", y.shape)
+model = VHU_Net_Model(input_shape=(224,224,3))
+optim = Adam(learning_rate=1e-3)
+
+model.compile(
+    optimizer=optim,
+    loss=dice_loss,
+    metrics=[dice_coefficient,iou],
+    steps_per_execution=5,
+    jit_compile=True
+)
+
+EPOCHS = 35
+
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=EPOCHS,
+    verbose=1
+)
+import numpy as np
+from medpy.metric.binary import hd95, assd
+import tensorflow as tf
+
+# ----------------------
+# Safe Metric Wrappers
+# ----------------------
+def safe_hd95(y_true, y_pred):
+    """Compute HD95, return NaN if empty mask."""
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return hd95(y_pred, y_true)
+
+def safe_assd(y_true, y_pred):
+    """Compute ASSD, return NaN if empty mask."""
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return assd(y_pred, y_true)
+
+def threshold(pred):
+    """Convert predicted probabilities to binary mask."""
+    return (pred > 0.5).astype(np.uint8)
+
+def summary_stats(arr):
+    """Calculate mean, SD, 95% CI ignoring NaNs."""
+    arr = np.array(arr)
+    arr = arr[~np.isnan(arr)]  # remove NaNs
+    mean = np.mean(arr)
+    sd = np.std(arr)
+    ci = 1.96 * sd / np.sqrt(len(arr))
+    return mean, sd, (mean-ci, mean+ci)
+
+# ----------------------
+# Results dictionary
+# ----------------------
+results = {
+    "kidney": {"dice":[], "iou":[], "hd95":[], "assd":[]},
+    "tumor": {"dice":[], "iou":[], "hd95":[], "assd":[]},
+    "loss": []  # store per-sample loss if needed
+}
+
+# ----------------------
+# Loop through test dataset
+# ----------------------
+print("🔹 Evaluating model on test dataset...")
+for imgs, masks in test_ds:  # batch size = 1 recommended
+    preds = model.predict(imgs)
+    preds_bin = threshold(preds)
+
+    masks_np = masks.numpy().astype(np.uint8)
+
+    # ---------------- Kidney Metrics ----------------
+    kidney_true = (masks_np == 1).astype(np.uint8)
+    kidney_pred = (preds_bin == 1).astype(np.uint8)
+
+    results["kidney"]["dice"].append(dice_np(kidney_true, kidney_pred))
+    results["kidney"]["iou"].append(iou_np(kidney_true, kidney_pred))
+    results["kidney"]["hd95"].append(safe_hd95(kidney_true, kidney_pred))
+    results["kidney"]["assd"].append(safe_assd(kidney_true, kidney_pred))
+
+    # ---------------- Tumor Metrics ----------------
+    tumor_true = (masks_np == 2).astype(np.uint8)
+    tumor_pred = (preds_bin == 2).astype(np.uint8)
+
+    results["tumor"]["dice"].append(dice_np(tumor_true, tumor_pred))
+    results["tumor"]["iou"].append(iou_np(tumor_true, tumor_pred))
+    results["tumor"]["hd95"].append(safe_hd95(tumor_true, tumor_pred))
+    results["tumor"]["assd"].append(safe_assd(tumor_true, tumor_pred))
+
+    # ---------------- Loss ----------------
+    loss_val = model.evaluate(imgs, masks, verbose=0)
+    results["loss"].append(loss_val[0])  # only store loss
+
+# ----------------------
+# Final Summary
+# ----------------------
+print("\n==================== FINAL METRICS ====================")
+for cls in ["kidney", "tumor"]:
+    print(f"\n🎯 {cls.upper()} METRICS")
+    for metric in ["dice", "iou", "hd95", "assd"]:
+        mean_val, sd_val, ci = summary_stats(results[cls][metric])
+        print(f"{metric.upper():<6}: {mean_val:.4f} ± {sd_val:.4f} (95% CI: {ci[0]:.4f} – {ci[1]:.4f})")
+
+# Overall loss
+mean_loss, sd_loss, ci_loss = summary_stats(results["loss"])
+print(f"\n💥 LOSS: {mean_loss:.4f} ± {sd_loss:.4f} (95% CI: {ci_loss[0]:.4f} – {ci_loss[1]:.4f})")
+print("\n✅ Evaluation complete.")
+print(history.history.keys())
+import matplotlib.pyplot as plt
+
+import os
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+
+
+   
+
+# # Extract history
+epochs = range(1, len(history.history['dice_coefficient']) + 1)
+
+# Auto-detect max values
+max_dice = max(history.history['dice_coefficient'] + history.history['val_dice_coefficient'])
+max_iou  = max(history.history['iou'] + history.history['val_iou'])
+
+# Add margin above max
+dice_top = max_dice + 0.05
+iou_top  = max_iou + 0.05
+
+plt.figure(figsize=(12, 5))
+
+# ---------------- DICE PLOT ----------------
+plt.subplot(1, 2, 1)
+plt.plot(epochs, history.history['dice_coefficient'], label='Train Dice', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_dice_coefficient'], label='Val Dice', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('Dice Coefficient')
+plt.title('Dice Coefficient Over Epochs')
+plt.ylim(0.2, dice_top)      # <-- auto adjusted
+plt.legend()
+
+# ---------------- IOU PLOT ----------------
+plt.subplot(1, 2, 2)
+plt.plot(epochs, history.history['iou'], label='Train IoU', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_iou'], label='Val IoU', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('IoU Score')
+plt.title('IoU Score Over Epochs')
+plt.ylim(0.2, iou_top)       # <-- auto adjusted
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+#.............ConD-PDN Model.............#
+import tensorflow as tf
+from tensorflow.keras import layers, Model, Input
+from tensorflow.keras.layers import Conv2D, GlobalAveragePooling2D, Reshape, Multiply
+
+# Criss-Cross Attention
+def criss_cross_attention(x):
+    avg_pool = GlobalAveragePooling2D()(x)
+    avg_pool = Reshape((1, 1, x.shape[-1]))(avg_pool)
+    avg_pool = Conv2D(x.shape[-1], 1, padding='same', activation='sigmoid')(avg_pool)
+    return Multiply()([x, avg_pool])
+
+# Define Encoder Block (Using a standard convolutional approach)
+def encoder_block(x, filters):
+    conv = Conv2D(filters, (3, 3), activation='relu', padding='same')(x)
+    conv = Conv2D(filters, (3, 3), activation='relu', padding='same')(conv)
+    return conv, layers.MaxPooling2D(pool_size=(2, 2))(conv)
+
+# Define Decoder Block
+def decoder_block(x, skip, filters):
+    up = layers.UpSampling2D(size=(2, 2))(x)
+    merge = layers.Concatenate()([up, skip])
+    conv = Conv2D(filters, (3, 3), activation='relu', padding='same')(merge)
+    conv = Conv2D(filters, (3, 3), activation='relu', padding='same')(conv)
+    return conv
+
+# Define ConD-PDN Model
+def cond_pdn(input_shape=(256, 256, 1)):
+    inputs = Input(input_shape)
+
+    # Encoder
+    s1, p1 = encoder_block(inputs, 64)
+    s2, p2 = encoder_block(p1, 128)
+    s3, p3 = encoder_block(p2, 256)
+    s4, p4 = encoder_block(p3, 512)
+
+    # Bridge with Criss-Cross Attention
+    b = Conv2D(1024, (3, 3), activation='relu', padding='same')(p4)
+    b = Conv2D(1024, (3, 3), activation='relu', padding='same')(b)
+    b = criss_cross_attention(b)
+
+    # Decoder
+    d1 = decoder_block(b, s4, 512)
+    d2 = decoder_block(d1, s3, 256)
+    d3 = decoder_block(d2, s2, 128)
+    d4 = decoder_block(d3, s1, 64)
+
+    # Output Layer
+    outputs = Conv2D(1, (1, 1), activation='sigmoid', padding='same')(d4)
+
+    # Create Model
+    model = Model(inputs, outputs, name='ConD_PDN_with_cca')
+
+    return model
+
+# **Dice Coefficient**
+def Coffiecient_dice(y_true, y_pred, smooth=100):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    dice = (2 * intersection + smooth) / (union + smooth)
+    return dice
+
+# **Dice Loss**
+def Dice_loss(y_true, y_pred):
+    return -Coffiecient_dice(y_true, y_pred)
+
+# **IoU Metric**
+def Iou(y_true, y_pred, smooth=100):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_pred * y_true)
+    union = K.sum(y_true) + K.sum(y_pred)  
+    iou = (intersection + smooth) / (union - intersection + smooth)
+    return iou
+
+# Define learning rate
+learning_rate = 1e-3  
+
+# Initialize optimizer
+optim = Adam(learning_rate=learning_rate)
+
+# Compile the model
+model.compile(optimizer=optim, loss=Dice_loss, metrics=[Iou, Coffiecient_dice])
+model.summary()
+import tensorflow as tf
+from tensorflow.keras import backend as K
+
+# Dice Coefficient
+def coefficient_dice(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    
+    dice = (2 * intersection + smooth) / (union + smooth)
+    return dice
+
+# Dice Loss (Negative Dice Coefficient)
+def dice_loss(y_true, y_pred):
+    return -coefficient_dice(y_true, y_pred)
+
+# Intersection over Union (IoU)
+def iou(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    
+    iou = (intersection + smooth) / (union - intersection + smooth)
+    return iou
+
+# IoU Loss (Negative IoU)
+def iou_loss(y_true, y_pred):
+    return -iou(y_true, y_pred)
+def create_image_generator(data_frame, batch_size, image_color_mode, mask_color_mode, 
+                           image_save_prefix, mask_save_prefix, save_to_dir, target_size, seed):
+    # Check if columns exist
+    if 'img_path' not in data_frame.columns or 'mask_path' not in data_frame.columns:
+        raise ValueError("Columns 'img_path' and 'mask_path' not found in dataframe!")
+
+    img_gen = ImageDataGenerator()
+    mask_gen = ImageDataGenerator()
+
+    # Generator for images
+    img_gen = img_gen.flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='img_path',  # Ensure this column exists
+        class_mode=None,
+        color_mode=image_color_mode,
+        target_size=target_size,
+        batch_size=batch_size,
+        save_to_dir=save_to_dir,
+        save_prefix=image_save_prefix,
+        seed=seed
+    )
+
+    # Generator for masks
+    mask_gen = mask_gen.flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='mask_path',  # Ensure this column exists
+        class_mode=None,
+        color_mode=mask_color_mode,
+        target_size=target_size,
+        batch_size=batch_size,
+        save_to_dir=save_to_dir,
+        save_prefix=mask_save_prefix,
+        seed=seed
+    )
+
+    return img_gen, mask_gen
+EPOCHS = 35
+
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=EPOCHS,
+    verbose=1
+)
+import numpy as np
+from medpy.metric.binary import hd95, assd
+import tensorflow as tf
+
+# ----------------------
+# Safe Metric Wrappers
+# ----------------------
+def safe_hd95(y_true, y_pred):
+    """Compute HD95, return NaN if empty mask."""
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return hd95(y_pred, y_true)
+
+def safe_assd(y_true, y_pred):
+    """Compute ASSD, return NaN if empty mask."""
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return assd(y_pred, y_true)
+
+def threshold(pred):
+    """Convert predicted probabilities to binary mask."""
+    return (pred > 0.5).astype(np.uint8)
+
+def summary_stats(arr):
+    """Calculate mean, SD, 95% CI ignoring NaNs."""
+    arr = np.array(arr)
+    arr = arr[~np.isnan(arr)]  # remove NaNs
+    mean = np.mean(arr)
+    sd = np.std(arr)
+    ci = 1.96 * sd / np.sqrt(len(arr))
+    return mean, sd, (mean-ci, mean+ci)
+
+# ----------------------
+# Results dictionary
+# ----------------------
+results = {
+    "kidney": {"dice":[], "iou":[], "hd95":[], "assd":[]},
+    "tumor": {"dice":[], "iou":[], "hd95":[], "assd":[]},
+    "loss": []  # store per-sample loss if needed
+}
+
+# ----------------------
+# Loop through test dataset
+# ----------------------
+print("🔹 Evaluating model on test dataset...")
+for imgs, masks in test_ds:  # batch size = 1 recommended
+    preds = model.predict(imgs)
+    preds_bin = threshold(preds)
+
+    masks_np = masks.numpy().astype(np.uint8)
+
+    # ---------------- Kidney Metrics ----------------
+    kidney_true = (masks_np == 1).astype(np.uint8)
+    kidney_pred = (preds_bin == 1).astype(np.uint8)
+
+    results["kidney"]["dice"].append(dice_np(kidney_true, kidney_pred))
+    results["kidney"]["iou"].append(iou_np(kidney_true, kidney_pred))
+    results["kidney"]["hd95"].append(safe_hd95(kidney_true, kidney_pred))
+    results["kidney"]["assd"].append(safe_assd(kidney_true, kidney_pred))
+
+    # ---------------- Tumor Metrics ----------------
+    tumor_true = (masks_np == 2).astype(np.uint8)
+    tumor_pred = (preds_bin == 2).astype(np.uint8)
+
+    results["tumor"]["dice"].append(dice_np(tumor_true, tumor_pred))
+    results["tumor"]["iou"].append(iou_np(tumor_true, tumor_pred))
+    results["tumor"]["hd95"].append(safe_hd95(tumor_true, tumor_pred))
+    results["tumor"]["assd"].append(safe_assd(tumor_true, tumor_pred))
+
+    # ---------------- Loss ----------------
+    loss_val = model.evaluate(imgs, masks, verbose=0)
+    results["loss"].append(loss_val[0])  # only store loss
+
+# ----------------------
+# Final Summary
+# ----------------------
+print("\n==================== FINAL METRICS ====================")
+for cls in ["kidney", "tumor"]:
+    print(f"\n🎯 {cls.upper()} METRICS")
+    for metric in ["dice", "iou", "hd95", "assd"]:
+        mean_val, sd_val, ci = summary_stats(results[cls][metric])
+        print(f"{metric.upper():<6}: {mean_val:.4f} ± {sd_val:.4f} (95% CI: {ci[0]:.4f} – {ci[1]:.4f})")
+
+# Overall loss
+mean_loss, sd_loss, ci_loss = summary_stats(results["loss"])
+print(f"\n💥 LOSS: {mean_loss:.4f} ± {sd_loss:.4f} (95% CI: {ci_loss[0]:.4f} – {ci_loss[1]:.4f})")
+print("\n✅ Evaluation complete.")
+print(history.history.keys())
+import matplotlib.pyplot as plt
+
+import os
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+
+import os
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+
+   
+# Extract history
+epochs = range(1, len(history.history['coffiecient_dice']) + 1)
+
+# Auto-detect max values
+max_dice = max(history.history['coffiecient_dice'] + history.history['val_coffiecient_dice'])
+max_iou  = max(history.history['iou'] + history.history['val_iou'])
+
+# Add margin above max
+dice_top = max_dice + 0.05
+iou_top  = max_iou + 0.05
+
+plt.figure(figsize=(12, 5))
+
+# ---------------- DICE PLOT ----------------
+plt.subplot(1, 2, 1)
+plt.plot(epochs, history.history['coffiecient_dice'], label='Train Dice', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_coffiecient_dice'], label='Val Dice', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('Dice Coefficient')
+plt.title('Dice Coefficient Over Epochs')
+plt.ylim(0.2, dice_top)      # <-- auto adjusted
+plt.legend()
+
+# ---------------- IOU PLOT ----------------
+plt.subplot(1, 2, 2)
+plt.plot(epochs, history.history['iou'], label='Train IoU', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_iou'], label='Val IoU', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('IoU Score')
+plt.title('IoU Score Over Epochs')
+plt.ylim(0.2, iou_top)       # <-- auto adjusted
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+
+#............Function to fuse ConD-PDN and Transformer enchanced U-Net Model.....#
+import tensorflow as tf
+from tensorflow.keras import layers, Model, Input
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import backend as K
+
+def fusion_net(input_shape=(256, 256, 1)):
+    inputs = Input(input_shape)
+    conv = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
+    conv = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(conv)
+    output = layers.Conv2D(1, (1, 1), activation='sigmoid', padding='same')(conv)
+    return Model(inputs=inputs, outputs=output, name="Fusion_Net")
+
+# Function to fuse ConD-PDN and VHU-Net
+
+def fuse_models(cond_pdn_model, vhu_net_model, input_shape=(256, 256, 1)):
+    inputs = Input(input_shape)
+    
+    # Get outputs from both models
+    cond_pdn_output = cond_pdn_model(inputs)
+    vhu_net_output = vhu_net_model(inputs)
+    
+    # Fusion step: Averaging outputs
+    fused_output = layers.Average()([cond_pdn_output, vhu_net_output])
+    
+    # Final output layer
+    final_output = layers.Conv2D(1, (1, 1), activation='sigmoid', padding='same')(fused_output)
+    
+    return Model(inputs, final_output, name="Fused_ConD_VHU_Net")
+
+# Instantiate models
+input_shape = (256, 256, 1)
+cond_pdn_model = cond_pdn(input_shape)
+vhu_net_model = VHU_Net_Model(input_shape)
+
+# Fuse the models
+fused_model = fuse_models(cond_pdn_model, vhu_net_model, input_shape)
+
+# Define Dice Loss and IoU
+
+def Coffiecient_dice(y_true, y_pred, smooth=100):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    dice = (2 * intersection + smooth) / (union + smooth)
+    return dice
+
+def Dice_loss(y_true, y_pred):
+    return -Coffiecient_dice(y_true, y_pred)
+
+def Iou(y_true, y_pred, smooth=100):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    intersection = K.sum(y_pred * y_true)
+    union = K.sum(y_true) + K.sum(y_pred)  
+    iou = (intersection + smooth) / (union - intersection + smooth)
+    return iou
+
+# Compile fused model
+learning_rate = 1e-3  
+optim = Adam(learning_rate=learning_rate)
+fused_model.compile(optimizer=optim, loss=Dice_loss, metrics=[Iou, Coffiecient_dice])
+
+# Print model summary
+fused_model.summary()
+import tensorflow as tf
+from tensorflow.keras import backend as K
+
+# Dice Coefficient
+def coefficient_dice(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    
+    dice = (2 * intersection + smooth) / (union + smooth)
+    return dice
+
+# Dice Loss (Negative Dice Coefficient)
+def dice_loss(y_true, y_pred):
+    return -coefficient_dice(y_true, y_pred)
+
+# Intersection over Union (IoU)
+def iou(y_true, y_pred, smooth=1e-5):
+    y_true = K.flatten(y_true)
+    y_pred = K.flatten(y_pred)
+    
+    intersection = K.sum(y_true * y_pred)
+    union = K.sum(y_true) + K.sum(y_pred)
+    
+    iou = (intersection + smooth) / (union - intersection + smooth)
+    return iou
+
+# IoU Loss (Negative IoU)
+def iou_loss(y_true, y_pred):
+    return -iou(y_true, y_pred)
+def create_image_generator(data_frame, batch_size, image_color_mode, mask_color_mode, 
+                           image_save_prefix, mask_save_prefix, save_to_dir, target_size, seed):
+    # Check if columns exist
+    if 'img_path' not in data_frame.columns or 'mask_path' not in data_frame.columns:
+        raise ValueError("Columns 'img_path' and 'mask_path' not found in dataframe!")
+
+    img_gen = ImageDataGenerator()
+    mask_gen = ImageDataGenerator()
+
+    # Generator for images
+    img_gen = img_gen.flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='img_path',  # Ensure this column exists
+        class_mode=None,
+        color_mode=image_color_mode,
+        target_size=target_size,
+        batch_size=batch_size,
+        save_to_dir=save_to_dir,
+        save_prefix=image_save_prefix,
+        seed=seed
+    )
+
+    # Generator for masks
+    mask_gen = mask_gen.flow_from_dataframe(
+        dataframe=data_frame,
+        x_col='mask_path',  # Ensure this column exists
+        class_mode=None,
+        color_mode=mask_color_mode,
+        target_size=target_size,
+        batch_size=batch_size,
+        save_to_dir=save_to_dir,
+        save_prefix=mask_save_prefix,
+        seed=seed
+    )
+
+    return img_gen, mask_gen
+EPOCHS = 35
+
+history = model.fit(
+    train_ds,
+    validation_data=val_ds,
+    epochs=EPOCHS,
+    verbose=1
+)
+import numpy as np
+from medpy.metric.binary import hd95, assd
+import tensorflow as tf
+
+# ----------------------
+# Safe Metric Wrappers
+# ----------------------
+def safe_hd95(y_true, y_pred):
+    """Compute HD95, return NaN if empty mask."""
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return hd95(y_pred, y_true)
+
+def safe_assd(y_true, y_pred):
+    """Compute ASSD, return NaN if empty mask."""
+    if y_true.sum() == 0 or y_pred.sum() == 0:
+        return np.nan
+    return assd(y_pred, y_true)
+
+def threshold(pred):
+    """Convert predicted probabilities to binary mask."""
+    return (pred > 0.5).astype(np.uint8)
+
+def summary_stats(arr):
+    """Calculate mean, SD, 95% CI ignoring NaNs."""
+    arr = np.array(arr)
+    arr = arr[~np.isnan(arr)]  # remove NaNs
+    mean = np.mean(arr)
+    sd = np.std(arr)
+    ci = 1.96 * sd / np.sqrt(len(arr))
+    return mean, sd, (mean-ci, mean+ci)
+
+# ----------------------
+# Results dictionary
+# ----------------------
+results = {
+    "kidney": {"dice":[], "iou":[], "hd95":[], "assd":[]},
+    "tumor": {"dice":[], "iou":[], "hd95":[], "assd":[]},
+    "loss": []  # store per-sample loss if needed
+}
+
+# ----------------------
+# Loop through test dataset
+# ----------------------
+print("🔹 Evaluating model on test dataset...")
+for imgs, masks in test_ds:  # batch size = 1 recommended
+    preds = model.predict(imgs)
+    preds_bin = threshold(preds)
+
+    masks_np = masks.numpy().astype(np.uint8)
+
+    # ---------------- Kidney Metrics ----------------
+    kidney_true = (masks_np == 1).astype(np.uint8)
+    kidney_pred = (preds_bin == 1).astype(np.uint8)
+
+    results["kidney"]["dice"].append(dice_np(kidney_true, kidney_pred))
+    results["kidney"]["iou"].append(iou_np(kidney_true, kidney_pred))
+    results["kidney"]["hd95"].append(safe_hd95(kidney_true, kidney_pred))
+    results["kidney"]["assd"].append(safe_assd(kidney_true, kidney_pred))
+
+    # ---------------- Tumor Metrics ----------------
+    tumor_true = (masks_np == 2).astype(np.uint8)
+    tumor_pred = (preds_bin == 2).astype(np.uint8)
+
+    results["tumor"]["dice"].append(dice_np(tumor_true, tumor_pred))
+    results["tumor"]["iou"].append(iou_np(tumor_true, tumor_pred))
+    results["tumor"]["hd95"].append(safe_hd95(tumor_true, tumor_pred))
+    results["tumor"]["assd"].append(safe_assd(tumor_true, tumor_pred))
+
+    # ---------------- Loss ----------------
+    loss_val = model.evaluate(imgs, masks, verbose=0)
+    results["loss"].append(loss_val[0])  # only store loss
+
+# ----------------------
+# Final Summary
+# ----------------------
+print("\n==================== FINAL METRICS ====================")
+for cls in ["kidney", "tumor"]:
+    print(f"\n🎯 {cls.upper()} METRICS")
+    for metric in ["dice", "iou", "hd95", "assd"]:
+        mean_val, sd_val, ci = summary_stats(results[cls][metric])
+        print(f"{metric.upper():<6}: {mean_val:.4f} ± {sd_val:.4f} (95% CI: {ci[0]:.4f} – {ci[1]:.4f})")
+
+# Overall loss
+mean_loss, sd_loss, ci_loss = summary_stats(results["loss"])
+print(f"\n💥 LOSS: {mean_loss:.4f} ± {sd_loss:.4f} (95% CI: {ci_loss[0]:.4f} – {ci_loss[1]:.4f})")
+print("\n✅ Evaluation complete.")
+print(history.history.keys())
+import matplotlib.pyplot as plt
+
+import os
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+
+
+# Extract history
+epochs = range(1, len(history.history['coffiecient_dice']) + 1)
+
+# Auto-detect max values
+max_dice = max(history.history['coffiecient_dice'] + history.history['val_coffiecient_dice'])
+max_iou  = max(history.history['iou'] + history.history['val_iou'])
+
+# Add margin above max
+dice_top = max_dice + 0.05
+iou_top  = max_iou + 0.05
+
+plt.figure(figsize=(12, 5))
+
+# ---------------- DICE PLOT ----------------
+plt.subplot(1, 2, 1)
+plt.plot(epochs, history.history['coffiecient_dice'], label='Train Dice', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_coffiecient_dice'], label='Val Dice', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('Dice Coefficient')
+plt.title('Dice Coefficient Over Epochs')
+plt.ylim(0.2, dice_top)      # <-- auto adjusted
+plt.legend()
+
+# ---------------- IOU PLOT ----------------
+plt.subplot(1, 2, 2)
+plt.plot(epochs, history.history['iou'], label='Train IoU', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_iou'], label='Val IoU', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('IoU Score')
+plt.title('IoU Score Over Epochs')
+plt.ylim(0.2, iou_top)       # <-- auto adjusted
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+#.........................Table 8, Table 9 showthe KiTS23 dataset result............#
