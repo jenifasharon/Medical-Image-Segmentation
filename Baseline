@@ -1,5 +1,6 @@
-#..... Baseline 1 code U-Net++ train + Dice/IoU/mAP/HD95/ASSD.....#
+#..........Baeline model code Table 13.........#
 
+#............UNet++...................#
 import os
 os.listdir("/kaggle/input")
 import os
@@ -143,7 +144,11 @@ def display_augmented_samples(df, num_samples=5):
 
 print("\n🔹 Showing 5 augmented sample pairs...")
 display_augmented_samples(df, num_samples=5)
+#.....................................Image folder: /kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/images
+Mask folder : /kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/masks
 
+Total images : 2027
+Total masks  : 2027..............................#
 # ============================================================
 # FAST PURE-TF PIPELINE: U-Net++ train + Dice/IoU/mAP/HD95/ASSD
 # Single cell - Kaggle-ready (images/ and masks/ under BASE_PATH)
@@ -524,10 +529,11 @@ def show_predictions(model, dataset, n=4):
 print("\nShowing some validation predictions...")
 show_predictions(model, val_ds, n=4)
 
-#...........Basleine 2 U-Net..........#
+
+#.....................U-Net model..................#
+
 import os
 os.listdir("/kaggle/input")
-
 import os
 import numpy as np
 import cv2
@@ -556,6 +562,7 @@ for m in os.listdir(mask_dir):
 
 print("\nClasses inside masks:", classes_found)
 print(f"\nTotal unique classes found: {len(classes_found)}")
+
 
 # ==========================
 # 🔥 KAGGLE FULL SEGMENTATION PREP CODE (Single Cell)
@@ -956,10 +963,11 @@ def show_predictions(model, dataset, n=4):
 print("\nShowing some validation predictions...")
 show_predictions(model, val_ds, n=4)
 
-#..........Baseline 3 DeepLabV3+ (MobileNetV2 backbone)....#
+
+
+#.................DeepLabV3+ (MobileNetV2 backbone)........................#
 import os
 os.listdir("/kaggle/input")
-
 import os
 from glob import glob
 
@@ -981,6 +989,7 @@ print("Total masks:", len(mask_files))
 # If you want them in a tuple like before
 counts = (len(image_files), len(mask_files))
 print("Counts (images, masks):", counts)
+
 import os
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -1029,7 +1038,6 @@ print(f"Test samples: {len(test_df)}")
 
 # Optional: show first 5 entries
 train_df.head()
-
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 
@@ -1099,7 +1107,6 @@ EPOCHS = 35        # keep very low, only for checking pipeline
 BATCH_SIZE = 32    # MUST be 1 because dataset has only one sample
 learning_rate = 1e-4
 w, h = 256, 256   # keep same size as generator target_size
-
 import tensorflow as tf
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Conv2D, UpSampling2D, Concatenate
@@ -1167,6 +1174,7 @@ model = DeeplabV3Plus(input_shape=IMG_SIZE, num_classes=NUM_CLASSES)
 model.compile(optimizer=Adam(LR), loss='binary_crossentropy', metrics=['accuracy', MeanIoU(num_classes=2)])
 
 model.summary()
+
 # Single-cell end-to-end: data listing, generator, DeepLabV3+-style model (MobileNetV2 backbone),
 # BCE+Dice loss, Dice & IoU metrics, training (EPOCHS=35, BATCH_SIZE=1), evaluation and plots.
 # Includes mean ± SD calculation across multiple runs.
@@ -1175,7 +1183,7 @@ warnings.filterwarnings("ignore")
 import numpy as np
 import pandas as pd
 from glob import glob
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plta
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import Input, Conv2D, UpSampling2D, Concatenate
