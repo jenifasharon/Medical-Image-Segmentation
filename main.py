@@ -1518,3 +1518,218 @@ plt.axis("off")
 plt.tight_layout()
 plt.show()
 #........Table 7: Confusion matrices and heatmaps  result ........#
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from skimage import measure
+
+# Set dataset directories
+image_dir = r"C:\dataset\2d segmentation dataset\2d segmentation dataset\images"
+mask_dir = r"C:\dataset\2d segmentation dataset\2d segmentation dataset\masks"
+
+# Load image and mask file paths
+image_paths = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)
+                      if f.endswith(('.png', '.jpg', '.jpeg'))])
+mask_paths = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)
+                     if f.endswith(('.png', '.jpg', '.jpeg'))])
+
+# Create DataFrame
+test_df = pd.DataFrame({
+    'image_path': image_paths,
+    'mask_path': mask_paths
+})
+print(f"Loaded {len(test_df)} image-mask pairs.")
+
+# Function: Contour Overlay Visualization
+def overlay_contours(image, ground_truth, predicted, contour_level=0.5):
+    gt_contours = measure.find_contours(ground_truth.squeeze(), level=contour_level)
+    pred_contours = measure.find_contours(predicted.squeeze(), level=contour_level)
+    
+    plt.figure(figsize=(8, 8))
+    plt.imshow(image, cmap='gray')
+    
+    for contour in gt_contours:
+        plt.plot(contour[:, 1], contour[:, 0], linewidth=2, color='g', label='Ground Truth')
+    for contour in pred_contours:
+        plt.plot(contour[:, 1], contour[:, 0], linewidth=2, color='r', label='Prediction')
+    
+    plt.title("Contour Overlay\nGreen: Ground Truth, Red: Prediction")
+    plt.axis('off')
+    plt.show()
+
+# Function: Error Map Visualization
+def error_map_visualization(ground_truth, predicted):
+    error = np.abs(ground_truth - predicted)
+    plt.figure(figsize=(6, 6))
+    plt.imshow(error.squeeze(), cmap='hot')
+    plt.colorbar()
+    plt.title("Error Map (Absolute Difference)")
+    plt.axis('off')
+    plt.show()
+
+# Function to demonstrate visualizations
+def demo_visualizations(df, prediction_func=None):
+    import random
+    idx = random.randint(0, len(df)-1)
+    image_path = df.iloc[idx]['image_path']
+    mask_path = df.iloc[idx]['mask_path']
+    
+    image = load_img(image_path, target_size=(224, 224))
+    mask = load_img(mask_path, target_size=(224, 224), color_mode="grayscale")
+    
+    image_array = img_to_array(image) / 255.0
+    mask_array = img_to_array(mask) / 255.0
+    
+    predicted_mask = prediction_func(image_array) if prediction_func else mask_array
+    
+    overlay_contours(image_array, mask_array, predicted_mask)
+    error_map_visualization(mask_array, predicted_mask)
+
+# Run the demo (replace prediction_func with your model prediction if available)
+demo_visualizations(test_df, prediction_func=None)
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from skimage import measure
+
+# Set dataset directories
+image_dir = r"C:\dataset\2d segmentation dataset\2d segmentation dataset\images"
+mask_dir = r"C:\dataset\2d segmentation dataset\2d segmentation dataset\masks"
+
+# Load image and mask file paths
+image_paths = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)
+                      if f.endswith(('.png', '.jpg', '.jpeg'))])
+mask_paths = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)
+                     if f.endswith(('.png', '.jpg', '.jpeg'))])
+
+# Create DataFrame
+test_df = pd.DataFrame({
+    'image_path': image_paths,
+    'mask_path': mask_paths
+})
+print(f"Loaded {len(test_df)} image-mask pairs.")
+
+# Function: Contour Overlay Visualization
+def overlay_contours(image, ground_truth, predicted, contour_level=0.5):
+    gt_contours = measure.find_contours(ground_truth.squeeze(), level=contour_level)
+    pred_contours = measure.find_contours(predicted.squeeze(), level=contour_level)
+    
+    plt.figure(figsize=(8, 8))
+    plt.imshow(image, cmap='gray')
+    
+    for contour in gt_contours:
+        plt.plot(contour[:, 1], contour[:, 0], linewidth=2, color='g', label='Ground Truth')
+    for contour in pred_contours:
+        plt.plot(contour[:, 1], contour[:, 0], linewidth=2, color='r', label='Prediction')
+    
+    plt.title("Contour Overlay\nGreen: Ground Truth, Red: Prediction")
+    plt.axis('off')
+    plt.show()
+
+# Function: Error Map Visualization
+def error_map_visualization(ground_truth, predicted):
+    error = np.abs(ground_truth - predicted)
+    plt.figure(figsize=(6, 6))
+    plt.imshow(error.squeeze(), cmap='hot')
+    plt.colorbar()
+    plt.title("Error Map (Absolute Difference)")
+    plt.axis('off')
+    plt.show()
+
+# Function to demonstrate visualizations
+def demo_visualizations(df, prediction_func=None):
+    import random
+    idx = random.randint(0, len(df)-1)
+    image_path = df.iloc[idx]['image_path']
+    mask_path = df.iloc[idx]['mask_path']
+    
+    image = load_img(image_path, target_size=(224, 224))
+    mask = load_img(mask_path, target_size=(224, 224), color_mode="grayscale")
+    
+    image_array = img_to_array(image) / 255.0
+    mask_array = img_to_array(mask) / 255.0
+    
+    predicted_mask = prediction_func(image_array) if prediction_func else mask_array
+    
+    overlay_contours(image_array, mask_array, predicted_mask)
+    error_map_visualization(mask_array, predicted_mask)
+
+# Run the demo (replace prediction_func with your model prediction if available)
+demo_visualizations(test_df, prediction_func=None)
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from skimage import measure
+
+# Set dataset directories
+image_dir = r"C:\dataset\2d segmentation dataset\2d segmentation dataset\images"
+mask_dir = r"C:\dataset\2d segmentation dataset\2d segmentation dataset\masks"
+
+# Load image and mask file paths
+image_paths = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)
+                      if f.endswith(('.png', '.jpg', '.jpeg'))])
+mask_paths = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)
+                     if f.endswith(('.png', '.jpg', '.jpeg'))])
+
+# Create DataFrame
+test_df = pd.DataFrame({
+    'image_path': image_paths,
+    'mask_path': mask_paths
+})
+print(f"Loaded {len(test_df)} image-mask pairs.")
+
+# Function: Contour Overlay Visualization
+def overlay_contours(image, ground_truth, predicted, contour_level=0.5):
+    gt_contours = measure.find_contours(ground_truth.squeeze(), level=contour_level)
+    pred_contours = measure.find_contours(predicted.squeeze(), level=contour_level)
+    
+    plt.figure(figsize=(8, 8))
+    plt.imshow(image, cmap='gray')
+    
+    for contour in gt_contours:
+        plt.plot(contour[:, 1], contour[:, 0], linewidth=2, color='g', label='Ground Truth')
+    for contour in pred_contours:
+        plt.plot(contour[:, 1], contour[:, 0], linewidth=2, color='r', label='Prediction')
+    
+    plt.title("Contour Overlay\nGreen: Ground Truth, Red: Prediction")
+    plt.axis('off')
+    plt.show()
+
+# Function: Error Map Visualization
+def error_map_visualization(ground_truth, predicted):
+    error = np.abs(ground_truth - predicted)
+    plt.figure(figsize=(6, 6))
+    plt.imshow(error.squeeze(), cmap='hot')
+    plt.colorbar()
+    plt.title("Error Map (Absolute Difference)")
+    plt.axis('off')
+    plt.show()
+
+# Function to demonstrate visualizations
+def demo_visualizations(df, prediction_func=None):
+    import random
+    idx = random.randint(0, len(df)-1)
+    image_path = df.iloc[idx]['image_path']
+    mask_path = df.iloc[idx]['mask_path']
+    
+    image = load_img(image_path, target_size=(224, 224))
+    mask = load_img(mask_path, target_size=(224, 224), color_mode="grayscale")
+    
+    image_array = img_to_array(image) / 255.0
+    mask_array = img_to_array(mask) / 255.0
+    
+    predicted_mask = prediction_func(image_array) if prediction_func else mask_array
+    
+    overlay_contours(image_array, mask_array, predicted_mask)
+    error_map_visualization(mask_array, predicted_mask)
+
+# Run the demo (replace prediction_func with your model prediction if available)
+demo_visualizations(test_df, prediction_func=None)
+
