@@ -1,0 +1,51 @@
+import os
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# ==============================
+# Dataset directories
+# ==============================
+image_dir = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/images"
+mask_dir  = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/masks"
+
+# ==============================
+# Gather files and match images to masks
+# ==============================
+image_files = sorted([os.path.join(image_dir, f) for f in os.listdir(image_dir)
+                      if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+mask_files = sorted([os.path.join(mask_dir, f) for f in os.listdir(mask_dir)
+                     if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+
+# Safety check
+if len(image_files) != len(mask_files):
+    raise ValueError(f"Mismatch: {len(image_files)} images vs {len(mask_files)} masks")
+
+# Create DataFrame
+df = pd.DataFrame({'img_path': image_files, 'mask_path': mask_files})
+
+# ==============================
+# Split dataset: 80% train, 10% val, 10% test
+# ==============================
+train_df, temp_df = train_test_split(df, test_size=0.2, random_state=42, shuffle=True)
+val_df, test_df = train_test_split(temp_df, test_size=0.5, random_state=42, shuffle=True)
+
+# Reset indices
+train_df = train_df.reset_index(drop=True)
+val_df = val_df.reset_index(drop=True)
+test_df = test_df.reset_index(drop=True)
+
+# ==============================
+# Save split files
+# ==============================
+train_df[['img_path', 'mask_path']].to_csv('train_split.txt', index=False, sep=',')
+val_df[['img_path', 'mask_path']].to_csv('val_split.txt', index=False, sep=',')
+test_df[['img_path', 'mask_path']].to_csv('test_split.txt', index=False, sep=',')
+
+# ==============================
+# Summary
+# ==============================
+print(f"Total samples: {len(df)}")
+print(f"Training samples: {len(train_df)}")
+print(f"Validation samples: {len(val_df)}")
+print(f"Test samples: {len(test_df)}")
+print("Split files saved: train_split.txt, val_split.txt, test_split.txt")
