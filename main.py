@@ -399,7 +399,7 @@ def create_image_generator(data_frame,
                            mask_save_prefix="mask",
                            save_to_dir=None,
                            target_size=(256, 256),
-                           seed=1):
+                           seed=42):
 
     def normalize(img, mask):
         img = img / 255.0
