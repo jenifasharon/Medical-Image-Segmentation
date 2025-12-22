@@ -118,9 +118,6 @@ The model consistently outperforms baseline architectures including U-Net, UNet+
 * All hyperparameters documented
 * Script-to-table correspondence maintained between code and reported results
 
----Here is a **very short, clean section** you can paste **directly into your GitHub README** (no extra explanation, reviewer-safe):
-
----
 
 ## Reproducibility
 
