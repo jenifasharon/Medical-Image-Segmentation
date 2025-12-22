@@ -118,7 +118,27 @@ The model consistently outperforms baseline architectures including U-Net, UNet+
 * All hyperparameters documented
 * Script-to-table correspondence maintained between code and reported results
 
+---Here is a **very short, clean section** you can paste **directly into your GitHub README** (no extra explanation, reviewer-safe):
+
 ---
+
+## Reproducibility
+
+* **Fixed seeds:** All experiments use a fixed random seed (`SEED = 42`) for data splitting, training, and evaluation.
+* **Deterministic splits:** Exact dataset partitions are released as plain-text files: `train_split.txt`, `val_split.txt`, and `test_split.txt`.
+* **Script-to-table mapping:** Each table and figure in the paper is directly linked to its generating script (see mapping below).
+
+| Script                  | Paper Content                                        |
+| ----------------------- | ---------------------------------------------------- |
+| `main.py`               | Primary results, Tables 5–7, 9, 12–13; Figures 12–16 |
+| `data_augmentation.py`  | Figures 9–10; Table 3                                |
+| `data_split.py`         | Table 8                                              |
+| `ablation_study.py`     | Table 11; Figures 18–20                              |
+| `visualize_overlays.py` | Tables 4, 10                                         |
+| `evaluation_metrics.py` | Table 7; Figure 17                                   |
+
+All results in the paper can be reproduced using the released code, fixed seeds, and provided split files. 
+
 
 ## How to Run
 
