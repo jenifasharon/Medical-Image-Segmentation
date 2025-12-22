@@ -4,9 +4,7 @@ Reproducibility
 Tagged Release: v1.0
 Commit Hash: 2c984a1
 
-Below is a **clean, reviewer-ready README.md** you can directly copy into your GitHub repository. It is concise, technical, reproducible, and aligned with your paper.
 
----
 
 # VHUCS-Net: Advanced Kidney Mass Segmentation
 
@@ -64,8 +62,6 @@ Additional validation datasets:
 * Validation: 10%
 * Testing: 10%
 
-Splits are provided as **plain-text ID files** to ensure full reproducibility.
-
 ---
 
 ## Experimental Setup
@@ -110,14 +106,6 @@ On the Kidney Segmentation Dataset, **VHUCS-Net** achieves:
 The model consistently outperforms baseline architectures including U-Net, UNet++, MobileNetV2, and DeepLabV3+.
 
 ---
-
-## Reproducibility
-
-* Fixed random seeds used across experiments
-* Explicit train/validation/test split files included
-* All hyperparameters documented
-* Script-to-table correspondence maintained between code and reported results
-
 
 ## Reproducibility
 
