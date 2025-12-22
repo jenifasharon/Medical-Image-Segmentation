@@ -113,10 +113,12 @@ The model consistently outperforms baseline architectures including U-Net, UNet+
 * **Deterministic splits:** Exact dataset partitions are released as plain-text files: `train_split.txt`, `val_split.txt`, and `test_split.txt`.
 * **Script-to-table mapping:** Each table and figure in the paper is directly linked to its generating script (see mapping below).
 
-Fixed Random Seeds
+
+### Fixed Random Seeds
 
 All experiments were conducted using fixed random seeds to ensure deterministic behavior and reproducibility across runs.
 
+```python
 # Fixed seeds used in all experiments
 import os
 import random
@@ -128,29 +130,40 @@ os.environ["PYTHONHASHSEED"] = str(SEED)
 random.seed(SEED)
 np.random.seed(SEED)
 tf.random.set_seed(SEED)
+```
 
+The same seed (`SEED = 42`) is used consistently for:
 
-The same seed (SEED = 42) is used consistently for:
+* Dataset splitting
+* Weight initialization
+* Data shuffling
+* Training and evaluation across all datasets
 
-Dataset splitting
+---
 
-Weight initialization
+### Plain-Text Dataset Split Files
 
-Data shuffling
+To prevent data leakage and guarantee reproducibility, dataset splits are **explicitly defined and released** as plain-text files in the repository.
 
-Training and evaluation across all datasets
+**Files included in the root directory:**
 
-Plain-Text Dataset Split Files
-
-To prevent data leakage and guarantee reproducibility, dataset splits are explicitly defined and released as plain-text files in the repository.
-
-Files included in the root directory:
-
+```
 train_split.txt   # Training image IDs
 val_split.txt     # Validation image IDs
 test_split.txt    # Test image IDs
+```
 
+Each file contains **one image ID per line**, ensuring that all experiments can be reproduced exactly without reliance on random or implicit splitting.
 
+These split files are used consistently across:
+
+* Baseline models
+* Ablation studies
+* Cross-dataset evaluation
+* KiTS23 experiments
+
+---
+###Script-to-Table Mapping
 
 
 | Script                  | Paper Content                                        |
@@ -182,5 +195,7 @@ python main.py
 Ensure dataset paths are correctly set inside `main.py`.
 
 ---
+
+
 
 
