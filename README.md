@@ -113,6 +113,46 @@ The model consistently outperforms baseline architectures including U-Net, UNet+
 * **Deterministic splits:** Exact dataset partitions are released as plain-text files: `train_split.txt`, `val_split.txt`, and `test_split.txt`.
 * **Script-to-table mapping:** Each table and figure in the paper is directly linked to its generating script (see mapping below).
 
+Fixed Random Seeds
+
+All experiments were conducted using fixed random seeds to ensure deterministic behavior and reproducibility across runs.
+
+# Fixed seeds used in all experiments
+import os
+import random
+import numpy as np
+import tensorflow as tf
+
+SEED = 42
+os.environ["PYTHONHASHSEED"] = str(SEED)
+random.seed(SEED)
+np.random.seed(SEED)
+tf.random.set_seed(SEED)
+
+
+The same seed (SEED = 42) is used consistently for:
+
+Dataset splitting
+
+Weight initialization
+
+Data shuffling
+
+Training and evaluation across all datasets
+
+Plain-Text Dataset Split Files
+
+To prevent data leakage and guarantee reproducibility, dataset splits are explicitly defined and released as plain-text files in the repository.
+
+Files included in the root directory:
+
+train_split.txt   # Training image IDs
+val_split.txt     # Validation image IDs
+test_split.txt    # Test image IDs
+
+
+
+
 | Script                  | Paper Content                                        |
 | ----------------------- | ---------------------------------------------------- |
 | `main.py`               | Primary results, Tables 5–7, 9, 12–13; Figures 12–16 |
