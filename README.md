@@ -1,8 +1,8 @@
 Reproducibility
 ---------------
 
-Tagged Release: v6.0
-Commit Hash: 41352c4
+Tagged Release: v7.0
+Commit Hash: 172e372 
 
 
 
