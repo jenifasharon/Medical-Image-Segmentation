@@ -1733,3 +1733,39 @@ def demo_visualizations(df, prediction_func=None):
 # Run the demo (replace prediction_func with your model prediction if available)
 demo_visualizations(test_df, prediction_func=None)
 
+#inference time,  Per-slice time and Per-volume time
+per_slice_time_32 = batch_time_32 / 32
+print(f"Per-slice time (batch=32): {per_slice_time_32:.6f} seconds")slices_per_volume = 30
+per_volume_time_32 = per_slice_time_32 * slices_per_volume
+
+print(f"Per-volume time
+input_shape = (256, 256, 1)
+
+vhu_net_model = VHU_Net_Model(input_shape)
+cond_pdn_model = cond_pdn(input_shape)
+
+fused_model = fuse_models(cond_pdn_model, vhu_net_model, input_shape)
+fused_model.save("/kaggle/working/Fused_VHU_ConD_PDN.keras")
+os.listdir("/kaggle/working")
+batch_size = 32
+dummy_input_32 = tf.random.uniform((batch_size, 256, 256, 1))for _ in range(5):
+    _ = fused_model(dummy_input_32, training=False)import time
+import numpy as np
+
+times_32 = []
+
+for _ in range(30):   # 30 runs
+    start = time.time()
+    _ = fused_model(dummy_input_32, training=False)
+    end = time.time()
+    times_32.append(end - start)
+
+batch_time_32 = np.mean(times_32)
+
+print(f"Batch-32 inference time: {batch_time_32:.4f} seconds")
+per_slice_time_32 = batch_time_32 / 32
+print(f"Per-slice time (batch=32): {per_slice_time_32:.6f} seconds")slices_per_volume = 30
+per_volume_time_32 = per_slice_time_32 * slices_per_volume
+
+print(f"Per-volume time (batch=32): {per_volume_time_32:.4f} seconds")
+
