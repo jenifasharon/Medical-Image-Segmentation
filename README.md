@@ -63,25 +63,74 @@ Additional validation datasets:
 * Testing: 10%
 
 ---
+## Dataset Pairing and Validation Summary
+
+All datasets used in this study were subjected to an automated image–mask pairing validation process. The scripts verify one-to-one correspondence between images and their ground-truth masks and report any unpaired files. The validated pairing statistics are summarized below.
+
+### Kidney Segmentation Dataset
+- **Total images:** 2,027  
+- **Total masks:** 2,027  
+- **Valid matched pairs:** 2,027  
+- **Unpaired images:** 0  
+- **Unpaired masks:** 0  
+
+### Blood Cell Segmentation Dataset (BCCD)
+- **Total images:** 1,328  
+- **Total masks:** 1,328  
+- **Valid matched pairs:** 1,328  
+- **Unpaired images:** 0  
+- **Unpaired masks:** 0  
+
+### HAM10000 (Images + Lesion Masks)
+- **Total images (Part 1 + Part 2):** 10,015  
+- **Total masks:** 10,015  
+- **Valid matched pairs:** 10,015  
+- **Unpaired images:** 0  
+- **Unpaired masks:** 0  
+
+### KiTS23 (Augmented)
+- **Total images:** 39,080  
+- **Total masks:** 39,080  
+- **Valid matched pairs:** 39,080  
+- **Unpaired images:** 0  
+- **Unpaired masks:** 0  
+
+### KiTS23 (Not Augmented)
+- **Total images:** 7,816  
+- **Total masks:** 7,815  
+- **Valid matched pairs:** 7,815  
+- **Unpaired images:** 1  
+- **Unpaired masks:** 0  
+
+### Overall KiTS23 Summary
+- **Augmented valid pairs:** 39,080  
+- **Not-augmented valid pairs:** 7,815  
+- **Total valid pairs:** 46,895  
+
+All pairing scripts and validation logs are provided in the repository to ensure full transparency and reproducibility.
+---
 
 ## Experimental Setup
 
-* Environment: Anaconda3 (64-bit), Jupyter Notebook
-* CPU: Intel® Core™ i5-10300H (4 cores / 8 threads, 2.5–4.5 GHz)
-* RAM: 16 GB
-* Precision: float32
-* Input size: 256 × 256 × 1
-* Batch size: 32
-* Epochs: 35
-* Optimizer: Adam
-* Loss: Dice Loss
+- **Execution environment:** Notebook-based 
+- **GPU:** NVIDIA Tesla P100 (16 GB VRAM)  
+- **CUDA:** 12.8    
+- **RAM:** 16 GB  
+- **Precision:** float32 (fp32)  
+- **Input size:** 256 × 256 × 1  
+- **Batch size:** 32  
+- **Epochs:** 35  
+- **Optimizer:** Adam  
+- **Loss function:** Dice Loss  
 
-**Inference performance**:
+## Inference Runtime
 
-* ~0.00147 s per slice
-* ~0.044 s per volume (30 slices)
-* CPU-only execution (no GPU required)
+- **Runtime per batch:** 0.3537 s  
+- **Runtime per slice:** 0.0111 s (0.3537 / 32)  
+- **Runtime per volume:** 0.3316 s (30 slices per volume)  
+- **Memory usage:** GPU execution within 16 GB VRAM  
 
+Runtime is reported consistently at both slice-level and volume-level inference.
 ---
 
 ## Evaluation Metrics
