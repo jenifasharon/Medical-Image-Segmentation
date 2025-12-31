@@ -1,0 +1,354 @@
+#######################3kidney-segmentation-dataset#############################################################
+import os
+import pandas as pd
+
+# ==============================
+# Dataset paths (your exact paths)
+# ==============================
+IMAGE_DIR = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/images"
+MASK_DIR  = "/kaggle/input/kidney-segmentation-dataset/2d segmentation dataset/2d segmentation dataset/masks"
+
+# ==============================
+# Helper function
+# ==============================
+def stem(filename):
+    """Return filename without extension"""
+    return os.path.splitext(filename)[0]
+
+# ==============================
+# Collect files
+# ==============================
+image_files = sorted([f for f in os.listdir(IMAGE_DIR) if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+mask_files  = sorted([f for f in os.listdir(MASK_DIR)  if f.lower().endswith(('.png', '.jpg', '.jpeg'))])
+
+image_ids = {stem(f): f for f in image_files}
+mask_ids  = {stem(f): f for f in mask_files}
+
+# ==============================
+# Match image-mask pairs
+# ==============================
+valid_pairs = []
+unpaired_images = []
+unpaired_masks = []
+
+for img_id, img_name in image_ids.items():
+    if img_id in mask_ids:
+        valid_pairs.append({
+            "image": os.path.join(IMAGE_DIR, img_name),
+            "mask":  os.path.join(MASK_DIR, mask_ids[img_id])
+        })
+    else:
+        unpaired_images.append(img_name)
+
+for mask_id, mask_name in mask_ids.items():
+    if mask_id not in image_ids:
+        unpaired_masks.append(mask_name)
+
+# ==============================
+# Convert to DataFrame
+# ==============================
+pairs_df = pd.DataFrame(valid_pairs)
+
+# ==============================
+# Save outputs (for GitHub + paper)
+# ==============================
+pairs_df.to_csv("valid_image_mask_pairs.csv", index=False)
+
+with open("unpaired_images.txt", "w") as f:
+    for item in unpaired_images:
+        f.write(item + "\n")
+
+with open("unpaired_masks.txt", "w") as f:
+    for item in unpaired_masks:
+        f.write(item + "\n")
+
+# ==============================
+# Print summary (important for paper)
+# ==============================
+print("===== IMAGE–MASK PAIRING SUMMARY =====")
+print(f"Total images           : {len(image_files)}")
+print(f"Total masks            : {len(mask_files)}")
+print(f"Valid matched pairs    : {len(pairs_df)}")
+print(f"Unpaired images        : {len(unpaired_images)}")
+print(f"Unpaired masks         : {len(unpaired_masks)}")
+
+print("\nFiles generated:")
+print(" - valid_image_mask_pairs.csv")
+print(" - unpaired_images.txt")
+print(" - unpaired_masks.txt")
+
+##################bccd-dataset-with-mask##########################################
+import os
+import pandas as pd
+
+# ==============================
+# Dataset paths (BCCD – full dataset)
+# ==============================
+BASE_DIR = "/kaggle/input/bccd-dataset-with-mask/BCCD Dataset with mask"
+
+IMG_DIRS = [
+    os.path.join(BASE_DIR, "train", "original"),
+    os.path.join(BASE_DIR, "test", "original"),
+]
+
+MASK_DIRS = [
+    os.path.join(BASE_DIR, "train", "mask"),
+    os.path.join(BASE_DIR, "test", "mask"),
+]
+
+# ==============================
+# Helper functions
+# ==============================
+def stem(fname):
+    return os.path.splitext(fname)[0]
+
+def get_all_files(folders):
+    files = []
+    for folder in folders:
+        files.extend([
+            os.path.join(folder, f)
+            for f in os.listdir(folder)
+            if f.lower().endswith((".png", ".jpg", ".jpeg"))
+        ])
+    return sorted(files)
+
+# ==============================
+# Collect all images and masks
+# ==============================
+image_files = get_all_files(IMG_DIRS)
+mask_files  = get_all_files(MASK_DIRS)
+
+image_ids = {stem(os.path.basename(f)): f for f in image_files}
+mask_ids  = {stem(os.path.basename(f)): f for f in mask_files}
+
+valid_pairs = []
+unpaired_images = []
+unpaired_masks = []
+
+# Match images → masks
+for img_id, img_path in image_ids.items():
+    if img_id in mask_ids:
+        valid_pairs.append({
+            "image_path": img_path,
+            "mask_path": mask_ids[img_id]
+        })
+    else:
+        unpaired_images.append(img_path)
+
+# Find masks without images
+for mask_id, mask_path in mask_ids.items():
+    if mask_id not in image_ids:
+        unpaired_masks.append(mask_path)
+
+# ==============================
+# Save full valid pair list
+# ==============================
+df = pd.DataFrame(valid_pairs)
+df.to_csv("valid_image_mask_pairs.csv", index=False)
+
+with open("unpaired_images.txt", "w") as f:
+    for x in unpaired_images:
+        f.write(x + "\n")
+
+with open("unpaired_masks.txt", "w") as f:
+    for x in unpaired_masks:
+        f.write(x + "\n")
+
+# ==============================
+# Final summary (what reviewer wants)
+# ==============================
+print("\n===== IMAGE–MASK PAIRING SUMMARY =====")
+print(f"Total images        : {len(image_files)}")
+print(f"Total masks         : {len(mask_files)}")
+print(f"Valid matched pairs : {len(df)}")
+print(f"Unpaired images     : {len(unpaired_images)}")
+print(f"Unpaired masks      : {len(unpaired_masks)}")
+
+# ==============================
+# Files generated
+# ==============================
+print("\nFiles generated:")
+print(" - valid_image_mask_pairs.csv")
+print(" - unpaired_images.txt")
+print(" - unpaired_masks.txt")
+
+#########################ham10000-lesion-segmentations', 'skin-cancer-mnist-ham10000###################
+import os
+import pandas as pd
+
+# ==============================
+# Dataset paths (HAM10000)
+# ==============================
+MASK_DIR = "/kaggle/input/ham10000-lesion-segmentations/HAM10000_segmentations_lesion_tschandl"
+
+IMG_DIR_1 = "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_images_part_1"
+IMG_DIR_2 = "/kaggle/input/skin-cancer-mnist-ham10000/HAM10000_images_part_2"
+
+# ==============================
+# Helper functions
+# ==============================
+def stem(fname):
+    return os.path.splitext(fname)[0]
+
+def list_images(folder):
+    return [
+        f for f in os.listdir(folder)
+        if f.lower().endswith((".jpg", ".jpeg", ".png"))
+    ]
+
+# ==============================
+# Collect images from both parts
+# ==============================
+images = {}
+
+for folder in [IMG_DIR_1, IMG_DIR_2]:
+    for f in list_images(folder):
+        images[stem(f)] = os.path.join(folder, f)
+
+# ==============================
+# Collect masks
+# ==============================
+masks = {}
+for f in list_images(MASK_DIR):
+    masks[stem(f).replace("_segmentation", "")] = os.path.join(MASK_DIR, f)
+
+# ==============================
+# Match image–mask pairs
+# ==============================
+valid_pairs = []
+unpaired_images = []
+unpaired_masks = []
+
+for img_id, img_path in images.items():
+    if img_id in masks:
+        valid_pairs.append({
+            "image": img_path,
+            "mask": masks[img_id]
+        })
+    else:
+        unpaired_images.append(img_path)
+
+for mask_id, mask_path in masks.items():
+    if mask_id not in images:
+        unpaired_masks.append(mask_path)
+
+# ==============================
+# Save outputs
+# ==============================
+pairs_df = pd.DataFrame(valid_pairs)
+pairs_df.to_csv("valid_image_mask_pairs_ham10000.csv", index=False)
+
+with open("unpaired_images_ham10000.txt", "w") as f:
+    for x in unpaired_images:
+        f.write(x + "\n")
+
+with open("unpaired_masks_ham10000.txt", "w") as f:
+    for x in unpaired_masks:
+        f.write(x + "\n")
+
+# ==============================
+# Print summary (for paper)
+# ==============================
+print("===== HAM10000 IMAGE–MASK PAIRING SUMMARY =====")
+print(f"Total images (part 1 + part 2): {len(images)}")
+print(f"Total masks                   : {len(masks)}")
+print(f"Valid matched pairs           : {len(pairs_df)}")
+print(f"Unpaired images               : {len(unpaired_images)}")
+print(f"Unpaired masks                : {len(unpaired_masks)}")
+
+print("\nFiles generated:")
+print(" - valid_image_mask_pairs_ham10000.csv")
+print(" - unpaired_images_ham10000.txt")
+print(" - unpaired_masks_ham10000.txt")
+
+###########################KITS23###################################3
+import os
+import pandas as pd
+import re
+
+# ==============================
+# Paths
+# ==============================
+AUG_BASE = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL"
+NOAUG_BASE = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL"
+
+AUG_IMG_DIR = os.path.join(AUG_BASE, "JPEGImages")
+AUG_MASK_DIR = os.path.join(AUG_BASE, "Annotations")
+
+NOAUG_IMG_DIR = os.path.join(NOAUG_BASE, "JPEGImages")
+NOAUG_MASK_DIR = os.path.join(NOAUG_BASE, "Annotations")
+
+# ==============================
+# Extract slice key
+# slice_case_00010_17_aug3.jpg → slice_case_00010_17
+# ==============================
+def get_slice_key(fname):
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
+
+def list_files(folder):
+    return [f for f in os.listdir(folder) if f.lower().endswith((".png",".jpg",".jpeg"))]
+
+def verify_pairs(img_dir, mask_dir, tag):
+    img_files = list_files(img_dir)
+    mask_files = list_files(mask_dir)
+
+    img_map = {}
+    for f in img_files:
+        key = get_slice_key(f)
+        if key:
+            img_map.setdefault(key, []).append(f)
+
+    mask_map = {}
+    for f in mask_files:
+        key = get_slice_key(f)
+        if key:
+            mask_map[key] = f
+
+    valid_pairs = []
+    unpaired_images = []
+    unpaired_masks = []
+
+    for key, imgs in img_map.items():
+        if key in mask_map:
+            for img in imgs:   # multiple augmented images → one mask
+                valid_pairs.append({
+                    "image": os.path.join(img_dir, img),
+                    "mask": os.path.join(mask_dir, mask_map[key])
+                })
+        else:
+            unpaired_images.extend(imgs)
+
+    for key, mask in mask_map.items():
+        if key not in img_map:
+            unpaired_masks.append(mask)
+
+    df = pd.DataFrame(valid_pairs)
+    df.to_csv(f"valid_image_mask_pairs_{tag}.csv", index=False)
+
+    print(f"\n===== {tag.upper()} IMAGE–MASK PAIRING SUMMARY =====")
+    print("Total images        :", len(img_files))
+    print("Total masks         :", len(mask_files))
+    print("Valid matched pairs :", len(df))
+    print("Unpaired images     :", len(unpaired_images))
+    print("Unpaired masks      :", len(unpaired_masks))
+
+    return df
+
+# ==============================
+# Run
+# ==============================
+aug_df = verify_pairs(AUG_IMG_DIR, AUG_MASK_DIR, "kits23_augmented")
+noaug_df = verify_pairs(NOAUG_IMG_DIR, NOAUG_MASK_DIR, "kits23_not_augmented")
+
+print("\n===== OVERALL KiTS23 SUMMARY =====")
+print("Augmented valid pairs     :", len(aug_df))
+print("Not-augmented valid pairs :", len(noaug_df))
+print("Total valid pairs         :", len(aug_df) + len(noaug_df))
+print("\nFiles generated:")
+print(" - valid_image_mask_pairs_kits23_augmented.csv")
+print(" - valid_image_mask_pairs_kits23_not_augmented.csv")
+print(" - unpaired_images_kits23_augmented.txt")
+print(" - unpaired_masks_kits23_augmented.txt")
+print(" - unpaired_images_kits23_not_augmented.txt")
+print(" - unpaired_masks_kits23_not_augmented.txt")
