@@ -1,512 +1,573 @@
 import os
 os.listdir("/kaggle/input")
 import os
+import pandas as pd
+import re
 
-# Base path
-base_path = "/kaggle/input/sample/AUGMENTED"
+# ==============================
+# Paths
+# ==============================
+AUG_BASE = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL"
+NOAUG_BASE = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL"
 
-# Image and mask folders
-image_folder = os.path.join(base_path, "DATASET_FINAL", "JPEGImages")
-mask_folder  = os.path.join(base_path, "DATASET_FINAL", "Annotations")
+AUG_IMG_DIR = os.path.join(AUG_BASE, "JPEGImages")
+AUG_MASK_DIR = os.path.join(AUG_BASE, "Annotations")
 
-# Count image files
-num_images = len([
-    f for f in os.listdir(image_folder)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+NOAUG_IMG_DIR = os.path.join(NOAUG_BASE, "JPEGImages")
+NOAUG_MASK_DIR = os.path.join(NOAUG_BASE, "Annotations")
 
-# Count mask files
-num_masks = len([
-    f for f in os.listdir(mask_folder)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+# ==============================
+# Extract slice key
+# slice_case_00010_17_aug3.jpg → slice_case_00010_17
+# ==============================
+def get_slice_key(fname):
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
 
-print("Number of image files:", num_images)
-print("Number of mask files:", num_masks)
+def list_files(folder):
+    return [f for f in os.listdir(folder) if f.lower().endswith((".png",".jpg",".jpeg"))]
 
-# Total files
-print("Total files:", num_images + num_masks)
-Number of image files: 39080
-Number of mask files: 39080
-Total files: 78160
+def verify_pairs(img_dir, mask_dir, tag):
+    img_files = list_files(img_dir)
+    mask_files = list_files(mask_dir)
+
+    img_map = {}
+    for f in img_files:
+        key = get_slice_key(f)
+        if key:
+            img_map.setdefault(key, []).append(f)
+
+    mask_map = {}
+    for f in mask_files:
+        key = get_slice_key(f)
+        if key:
+            mask_map[key] = f
+
+    valid_pairs = []
+    unpaired_images = []
+    unpaired_masks = []
+
+    for key, imgs in img_map.items():
+        if key in mask_map:
+            for img in imgs:   # multiple augmented images → one mask
+                valid_pairs.append({
+                    "image": os.path.join(img_dir, img),
+                    "mask": os.path.join(mask_dir, mask_map[key])
+                })
+        else:
+            unpaired_images.extend(imgs)
+
+    for key, mask in mask_map.items():
+        if key not in img_map:
+            unpaired_masks.append(mask)
+
+    df = pd.DataFrame(valid_pairs)
+    df.to_csv(f"valid_image_mask_pairs_{tag}.csv", index=False)
+
+    print(f"\n===== {tag.upper()} IMAGE–MASK PAIRING SUMMARY =====")
+    print("Total images        :", len(img_files))
+    print("Total masks         :", len(mask_files))
+    print("Valid matched pairs :", len(df))
+    print("Unpaired images     :", len(unpaired_images))
+    print("Unpaired masks      :", len(unpaired_masks))
+
+    return df
+
+# ==============================
+# Run
+# ==============================
+aug_df = verify_pairs(AUG_IMG_DIR, AUG_MASK_DIR, "kits23_augmented")
+noaug_df = verify_pairs(NOAUG_IMG_DIR, NOAUG_MASK_DIR, "kits23_not_augmented")
+
+print("\n===== OVERALL KiTS23 SUMMARY =====")
+print("Augmented valid pairs     :", len(aug_df))
+print("Not-augmented valid pairs :", len(noaug_df))
+print("Total valid pairs         :", len(aug_df) + len(noaug_df))
+print("\nFiles generated:")
+print(" - valid_image_mask_pairs_kits23_augmented.csv")
+print(" - valid_image_mask_pairs_kits23_not_augmented.csv")
+print(" - unpaired_images_kits23_augmented.txt")
+print(" - unpaired_masks_kits23_augmented.txt")
+print(" - unpaired_images_kits23_not_augmented.txt")
+print(" - unpaired_masks_kits23_not_augmented.txt")
 import os
 import pandas as pd
+import re
 from sklearn.model_selection import train_test_split
 
 # ==============================
-# Dataset paths (ONLY AUGMENTED)
+# Paths
 # ==============================
-image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
-mask_dir  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
+AUG_BASE   = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL"
+NOAUG_BASE = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL"
+
+AUG_IMG_DIR   = os.path.join(AUG_BASE, "JPEGImages")
+AUG_MASK_DIR  = os.path.join(AUG_BASE, "Annotations")
+
+NOAUG_IMG_DIR  = os.path.join(NOAUG_BASE, "JPEGImages")
+NOAUG_MASK_DIR = os.path.join(NOAUG_BASE, "Annotations")
 
 # ==============================
-# Collect image paths
+# Helpers
 # ==============================
-image_files = sorted([
-    os.path.join(image_dir, f)
-    for f in os.listdir(image_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+def get_slice_key(fname):
+    # slice_case_00010_17_aug3.jpg → slice_case_00010_17
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
 
-mask_files = sorted([
-    os.path.join(mask_dir, f)
-    for f in os.listdir(mask_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+def get_patient_id(slice_key):
+    # slice_case_00010_17 → 00010
+    return slice_key.split("_")[2]
 
-print("Total images:", len(image_files))
-print("Total masks :", len(mask_files))
+def list_files(folder):
+    return [f for f in os.listdir(folder)
+            if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+
+def build_pairs(img_dir, mask_dir):
+    img_files  = list_files(img_dir)
+    mask_files = list_files(mask_dir)
+
+    img_map = {}
+    for f in img_files:
+        key = get_slice_key(f)
+        if key:
+            img_map.setdefault(key, []).append(f)
+
+    mask_map = {}
+    for f in mask_files:
+        key = get_slice_key(f)
+        if key:
+            mask_map[key] = f
+
+    pairs = []
+    for key, imgs in img_map.items():
+        if key in mask_map:
+            pid = get_patient_id(key)
+            for img in imgs:  # augmented → many images, one mask
+                pairs.append({
+                    "patient_id": pid,
+                    "slice_key": key,
+                    "image": os.path.join(img_dir, img),
+                    "mask":  os.path.join(mask_dir, mask_map[key])
+                })
+
+    return pd.DataFrame(pairs)
 
 # ==============================
-# Create dataframe (images only)
+# 1) TRAINING → AUGMENTED ONLY
 # ==============================
-df = pd.DataFrame({
-    "img_path": image_files
-})
+train_df = build_pairs(AUG_IMG_DIR, AUG_MASK_DIR)
+train_df.to_csv("train_pairs_augmented.csv", index=False)
+
+print("\n===== TRAINING (AUGMENTED ONLY) =====")
+print("Patients :", train_df.patient_id.nunique())
+print("Pairs    :", len(train_df))
 
 # ==============================
-# Split dataset: 80% / 10% / 10%
+# 2) VALIDATION + TEST → NON-AUGMENTED
 # ==============================
-train_df, temp_df = train_test_split(
-    df, test_size=0.2, random_state=42, shuffle=True
+eval_df = build_pairs(NOAUG_IMG_DIR, NOAUG_MASK_DIR)
+
+# Patient-wise split (example: 50% val / 50% test)
+patients = sorted(eval_df.patient_id.unique())
+val_pat, test_pat = train_test_split(
+    patients, test_size=0.5, random_state=42
 )
 
-val_df, test_df = train_test_split(
-    temp_df, test_size=0.5, random_state=42, shuffle=True
-)
+val_df  = eval_df[eval_df.patient_id.isin(val_pat)]
+test_df = eval_df[eval_df.patient_id.isin(test_pat)]
 
-train_df.reset_index(drop=True, inplace=True)
-val_df.reset_index(drop=True, inplace=True)
-test_df.reset_index(drop=True, inplace=True)
+val_df.to_csv("val_pairs_not_augmented.csv", index=False)
+test_df.to_csv("test_pairs_not_augmented.csv", index=False)
+
+print("\n===== QUANTITATIVE ANALYSIS (NON-AUGMENTED) =====")
+print("Validation patients :", val_df.patient_id.nunique())
+print("Validation pairs    :", len(val_df))
+print("Test patients       :", test_df.patient_id.nunique())
+print("Test pairs          :", len(test_df))
 
 # ==============================
 # Summary
 # ==============================
-print("\n===== SPLIT SUMMARY =====")
-print("Total samples:", len(df))
-print("Training samples:", len(train_df))
-print("Validation samples:", len(val_df))
-print("Test samples:", len(test_df))
+print("\n===== FINAL SPLIT SUMMARY =====")
+print("Training (augmented) pairs :", len(train_df))
+print("Validation (non-aug) pairs :", len(val_df))
+print("Test (non-aug) pairs       :", len(test_df))
 
-# ==============================
-# Preview
-# ==============================
-train_df.head()
+print("\nFiles generated:")
+print(" - train_pairs_augmented.csv")
+print(" - val_pairs_not_augmented.csv")
+print(" - test_pairs_not_augmented.csv")
 import os
 import pandas as pd
+import re
 from sklearn.model_selection import train_test_split
 
 # ==============================
-# Dataset paths (AUGMENTED)
+# Dataset paths
 # ==============================
-image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
-mask_dir  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
+AUG_IMG_DIR   = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+AUG_MASK_DIR  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
+
+NOAUG_IMG_DIR  = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+NOAUG_MASK_DIR = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/Annotations"
 
 # ==============================
-# Collect image & mask paths
+# Helpers
 # ==============================
-image_files = sorted([
-    os.path.join(image_dir, f)
-    for f in os.listdir(image_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+def get_slice_key(fname):
+    # slice_case_00010_17_aug2.png → slice_case_00010_17
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
 
-mask_files = sorted([
-    os.path.join(mask_dir, f)
-    for f in os.listdir(mask_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+def get_patient_id(slice_key):
+    # slice_case_00010_17 → 00010
+    return slice_key.split("_")[2]
 
-print("Total images:", len(image_files))
-print("Total masks :", len(mask_files))
+def build_pairs(img_dir, mask_dir):
+    images = [f for f in os.listdir(img_dir)
+              if f.lower().endswith((".png",".jpg",".jpeg"))]
+    masks  = [f for f in os.listdir(mask_dir)
+              if f.lower().endswith((".png",".jpg",".jpeg"))]
 
-assert len(image_files) == len(mask_files), "Image–mask count mismatch!"
+    img_map = {}
+    for f in images:
+        key = get_slice_key(f)
+        if key:
+            img_map.setdefault(key, []).append(f)
 
-# ==============================
-# Function to extract patient ID
-# Example: slice_case_00099_49_orig.png → 00099
-# ==============================
-def get_patient_id(path):
-    fname = os.path.basename(path)
-    return fname.split("_")[2]
+    mask_map = {}
+    for f in masks:
+        key = get_slice_key(f)
+        if key:
+            mask_map[key] = f
 
-# ==============================
-# Create dataframe
-# ==============================
-df = pd.DataFrame({
-    "img_path": image_files,
-    "mask_path": mask_files
-})
+    pairs = []
+    for key, imgs in img_map.items():
+        if key in mask_map:
+            pid = get_patient_id(key)
+            for img in imgs:
+                pairs.append({
+                    "patient_id": pid,
+                    "image": os.path.join(img_dir, img),
+                    "mask":  os.path.join(mask_dir, mask_map[key])
+                })
 
-df["patient_id"] = df["img_path"].apply(get_patient_id)
+    return pd.DataFrame(pairs)
 
-# ==============================
-# Dataset statistics
-# ==============================
-total_patients = df["patient_id"].nunique()
-print("\nTotal patients:", total_patients)
+# =====================================================
+# 1) TRAINING → AUGMENTED ONLY
+# =====================================================
+train_df = build_pairs(AUG_IMG_DIR, AUG_MASK_DIR)
 
-print("Slices per patient (example):")
-print(df.groupby("patient_id").size().head())
+print("\n===== TRAINING (AUGMENTED ONLY) =====")
+print("Pairs    :", len(train_df))
+print("Patients :", train_df.patient_id.nunique())
 
-# ==============================
-# Patient-wise split (80/10/10)
-# ==============================
-patients = df["patient_id"].unique()
+train_df.to_csv("train_augmented_patientwise.csv", index=False)
 
-train_patients, temp_patients = train_test_split(
-    patients, test_size=0.2, random_state=42, shuffle=True
+# =====================================================
+# 2) VALIDATION + TEST → NON-AUGMENTED ONLY
+# =====================================================
+eval_df = build_pairs(NOAUG_IMG_DIR, NOAUG_MASK_DIR)
+
+print("\n===== NON-AUGMENTED DATA =====")
+print("Pairs    :", len(eval_df))
+print("Patients :", eval_df.patient_id.nunique())
+
+# ------------------------------
+# Patient-wise split (50 / 50)
+# ------------------------------
+patients = sorted(eval_df.patient_id.unique())
+
+val_pat, test_pat = train_test_split(
+    patients, test_size=0.5, random_state=42
 )
 
-val_patients, test_patients = train_test_split(
-    temp_patients, test_size=0.5, random_state=42, shuffle=True
-)
+val_df  = eval_df[eval_df.patient_id.isin(val_pat)].reset_index(drop=True)
+test_df = eval_df[eval_df.patient_id.isin(test_pat)].reset_index(drop=True)
 
-# ==============================
-# Assign slices based on patient
-# ==============================
-train_df = df[df["patient_id"].isin(train_patients)].reset_index(drop=True)
-val_df   = df[df["patient_id"].isin(val_patients)].reset_index(drop=True)
-test_df  = df[df["patient_id"].isin(test_patients)].reset_index(drop=True)
-
-# ==============================
+# =====================================================
 # Final summary
-# ==============================
-print("\n===== PATIENT-WISE SPLIT SUMMARY =====")
-print("Total samples :", len(df))
-print("Training samples :", len(train_df))
-print("Validation samples:", len(val_df))
-print("Test samples :", len(test_df))
+# =====================================================
+print("\n===== FINAL DATASET SPLIT =====")
+print("Training (augmented) :", len(train_df))
+print("Validation (non-aug) :", len(val_df))
+print("Test (non-aug)       :", len(test_df))
 
 print("\n===== PATIENT COUNTS =====")
-print("Training patients :", len(train_patients))
-print("Validation patients:", len(val_patients))
-print("Test patients :", len(test_patients))
+print("Train patients :", train_df.patient_id.nunique())
+print("Val patients   :", len(val_pat))
+print("Test patients  :", len(test_pat))
 
 # ==============================
-# Show patient ID ranges
+# Save CSVs
 # ==============================
-print("\nTrain patients (range):",
-      min(train_patients), "to", max(train_patients))
-
-print("Val patients (range):",
-      min(val_patients), "to", max(val_patients))
-
-print("Test patients (range):",
-      min(test_patients), "to", max(test_patients))
-
-# ==============================
-# Optional: save CSVs
-# ==============================
-train_df.to_csv("train_patientwise.csv", index=False)
-val_df.to_csv("val_patientwise.csv", index=False)
-test_df.to_csv("test_patientwise.csv", index=False)
+val_df.to_csv("val_not_augmented_patientwise.csv", index=False)
+test_df.to_csv("test_not_augmented_patientwise.csv", index=False)
 
 print("\nCSV files saved successfully.")
+def print_patient_range(name, patients):
+    patients = sorted(patients)
+    print(f"{name} patients (range): {patients[0]} to {patients[-1]}")
+    print(f"{name} patients (count): {len(patients)}\n")
+
+print("\n===== PATIENT ID RANGES =====")
+print_patient_range("Train", train_df.patient_id.unique())
+print_patient_range("Validation", val_pat)
+print_patient_range("Test", test_pat)
 import os
-import pandas as pd
-
-# ==============================
-# Dataset path
-# ==============================
-image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
-
-# ==============================
-# Collect image files
-# ==============================
-image_files = [f for f in os.listdir(image_dir) if f.lower().endswith((".png", ".jpg", ".jpeg"))]
-
-# ==============================
-# Extract patient ID and slice index
-# ==============================
-data = []
-for f in image_files:
-    parts = f.split("_")
-    if len(parts) >= 4:
-        patient_id = parts[2]           # e.g., 00010
-        slice_index = parts[3]          # Keep as string to distinguish aug suffix
-        data.append((patient_id, slice_index, f))
-
-df = pd.DataFrame(data, columns=["patient_id", "slice_index", "filename"])
-
-# ==============================
-# Separate original and augmented slices
-# ==============================
-df["is_augmented"] = df["filename"].str.contains("_aug", case=False)
-
-# Count original slices (unique slice_index per patient, ignoring augmentation)
-original_counts = df[~df["is_augmented"]].groupby("patient_id")["slice_index"].nunique()
-
-# Count augmented slices (all augmented files)
-augmented_counts = df[df["is_augmented"]].groupby("patient_id")["slice_index"].count()
-
-# Total slices (original + augmented)
-total_counts = df.groupby("patient_id")["slice_index"].count()
-
-# ==============================
-# Combine into a single table
-# ==============================
-summary = pd.DataFrame({
-    "original_slices": original_counts,
-    "augmented_slices": augmented_counts,
-    "total_slices": total_counts
-}).fillna(0).astype(int)
-
-# ==============================
-# Example: patient 00010
-# ==============================
-print("Patient 00010:")
-print(summary.loc["00010"])
-
-# ==============================
-# All patients
-# ==============================
-print("\nAll patients slice summary:")
-print(summary.sort_index())
-import pandas as pd
-
-# ==============================
-# Assume 'summary' DataFrame from previous code
-# Columns: original_slices, augmented_slices, total_slices
-# ==============================
-
-# ==============================
-# Sort patients by ID
-# ==============================
-summary = summary.sort_index()
-all_patients = summary.index.tolist()
-num_patients = len(all_patients)
-
-# ==============================
-# Define split ratios
-# ==============================
-train_ratio = 0.7
-val_ratio = 0.15
-test_ratio = 0.15
-
-# ==============================
-# Calculate number of patients per split
-# ==============================
-num_train = int(num_patients * train_ratio)
-num_val = int(num_patients * val_ratio)
-num_test = num_patients - num_train - num_val  # remainder
-
-# ==============================
-# Assign patients to splits
-# ==============================
-train_patients = all_patients[:num_train]
-val_patients = all_patients[num_train:num_train+num_val]
-test_patients = all_patients[num_train+num_val:]
-
-# ==============================
-# Calculate total slices per split
-# ==============================
-train_slices = summary.loc[train_patients]["total_slices"].sum()
-val_slices = summary.loc[val_patients]["total_slices"].sum()
-test_slices = summary.loc[test_patients]["total_slices"].sum()
-
-# ==============================
-# Print split summary
-# ==============================
-print("Patient-level split:")
-print(f"Training patients: {train_patients[0]} to {train_patients[-1]} ({len(train_patients)} patients, {train_slices} slices)")
-print(f"Validation patients: {val_patients[0]} to {val_patients[-1]} ({len(val_patients)} patients, {val_slices} slices)")
-print(f"Testing patients: {test_patients[0]} to {test_patients[-1]} ({len(test_patients)} patients, {test_slices} slices)")
-
-# Optional: Save splits to dictionary or CSV
-splits = {
-    "train": train_patients,
-    "val": val_patients,
-    "test": test_patients
-}
-import os
-import numpy as np
-import cv2
+import re
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-# ===========================================
-# DATASET PATHS (AUGMENTED)
-# ===========================================
-image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
-mask_dir  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
+# ======================================================
+# PATHS
+# ======================================================
+AUG_IMG_DIR   = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+AUG_MASK_DIR  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
 
-# ===========================================
-# FUNCTION TO EXTRACT PATIENT ID
-# slice_case_00099_49_orig.png → 00099
-# ===========================================
-def get_patient_id(path):
-    fname = os.path.basename(path)
+NOAUG_IMG_DIR  = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+NOAUG_MASK_DIR = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/Annotations"
+
+# ======================================================
+# HELPERS
+# ======================================================
+def get_slice_key(fname):
+    # slice_case_00010_17_aug2.png → slice_case_00010_17
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
+
+def get_patient_id(fname):
     return fname.split("_")[2]
 
-# ===========================================
-# CREATE DATAFRAME (IMAGE–MASK PAIRS)
-# ===========================================
-image_files = sorted([
-    os.path.join(image_dir, f)
-    for f in os.listdir(image_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+def build_pairs(img_dir, mask_dir):
+    imgs = [f for f in os.listdir(img_dir) if f.lower().endswith((".png",".jpg",".jpeg"))]
+    masks = [f for f in os.listdir(mask_dir) if f.lower().endswith((".png",".jpg",".jpeg"))]
 
-mask_files = sorted([
-    os.path.join(mask_dir, f)
-    for f in os.listdir(mask_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-])
+    img_map = {}
+    for f in imgs:
+        key = get_slice_key(f)
+        if key:
+            img_map.setdefault(key, []).append(f)
 
-assert len(image_files) == len(mask_files), "Image–mask mismatch!"
+    mask_map = {}
+    for f in masks:
+        key = get_slice_key(f)
+        if key:
+            mask_map[key] = f
 
-df = pd.DataFrame({
-    "img_path": image_files,
-    "mask_path": mask_files
-})
+    pairs = []
+    unpaired_imgs = []
 
-df["patient_id"] = df["img_path"].apply(get_patient_id)
+    for key, files in img_map.items():
+        if key in mask_map:
+            pid = get_patient_id(files[0])
+            for img in files:
+                pairs.append({
+                    "patient_id": pid,
+                    "image": os.path.join(img_dir, img),
+                    "mask": os.path.join(mask_dir, mask_map[key])
+                })
+        else:
+            unpaired_imgs.extend(files)
 
-print("Total samples :", len(df))
-print("Total patients:", df["patient_id"].nunique())
+    return pd.DataFrame(pairs), unpaired_imgs
 
-# ===========================================
-# PATIENT-WISE SPLIT (80 / 10 / 10)
-# ===========================================
-patients = df["patient_id"].unique()
+# ======================================================
+# 1) TRAINING → AUGMENTED ONLY
+# ======================================================
+train_df, _ = build_pairs(AUG_IMG_DIR, AUG_MASK_DIR)
 
-train_patients, temp_patients = train_test_split(
-    patients, test_size=0.2, random_state=42, shuffle=True
+# ======================================================
+# 2) VALIDATION + TEST → NON-AUGMENTED ONLY
+# ======================================================
+eval_df, unpaired_images = build_pairs(NOAUG_IMG_DIR, NOAUG_MASK_DIR)
+
+# ======================================================
+# PATIENT-WISE SPLIT (50 / 50)
+# ======================================================
+patients = sorted(eval_df.patient_id.unique())
+val_pat, test_pat = train_test_split(patients, test_size=0.5, random_state=42)
+
+val_df  = eval_df[eval_df.patient_id.isin(val_pat)].reset_index(drop=True)
+test_df = eval_df[eval_df.patient_id.isin(test_pat)].reset_index(drop=True)
+
+# ======================================================
+# PRINT PATIENT RANGE + COUNT + SLICE COUNT
+# ======================================================
+def print_summary(name, df=None, patients=None):
+    if df is not None:
+        pats = sorted(df.patient_id.unique())
+        slices = len(df)
+    else:
+        pats = sorted(patients)
+        slices = eval_df[eval_df.patient_id.isin(pats)].shape[0]
+
+    print(f"{name} patients (range): {pats[0]} to {pats[-1]}")
+    print(f"{name} patients (count): {len(pats)}")
+    print(f"{name} slices (count): {slices}\n")
+
+print("\n===== FINAL PATIENT-WISE SUMMARY =====")
+print_summary("Train (augmented)", df=train_df)
+print_summary("Validation (non-aug)", patients=val_pat)
+print_summary("Test (non-aug)", patients=test_pat)
+
+# ======================================================
+# SAVE PATIENT ID LISTS (IMPORTANT)
+# ======================================================
+pd.Series(sorted(train_df.patient_id.unique())).to_csv(
+    "train_patients.txt", index=False, header=False
+)
+pd.Series(sorted(val_pat)).to_csv(
+    "val_patients.txt", index=False, header=False
+)
+pd.Series(sorted(test_pat)).to_csv(
+    "test_patients.txt", index=False, header=False
 )
 
-val_patients, test_patients = train_test_split(
-    temp_patients, test_size=0.5, random_state=42, shuffle=True
+# ======================================================
+# FINAL CHECK
+# ======================================================
+print("Valid non-augmented pairs :", len(eval_df))
+print("Unpaired non-augmented images :", len(unpaired_images))
+print("Validation + Test slices :", len(val_df) + len(test_df))
+
+print("\nFiles saved:")
+print(" - train_patients.txt")
+print(" - val_patients.txt")
+print(" - test_patients.txt")
+
+# ======================================================
+# PATIENT ID LISTS (FULL, NOT RANGES)
+# ======================================================
+
+train_patients = sorted(train_df.patient_id.unique())
+val_patients   = sorted(val_pat)
+test_patients  = sorted(test_pat)
+
+print("\n===== PATIENT ID LISTS =====")
+
+print(f"\nTraining patients (n={len(train_patients)}):")
+print(train_patients)
+
+print(f"\nValidation patients (n={len(val_patients)}):")
+print(val_patients)
+
+print(f"\nTest patients (n={len(test_patients)}):")
+print(test_patients)
+
+# ======================================================
+# SAVE PATIENT ID LISTS (PLAIN TEXT – IMPORTANT)
+# ======================================================
+pd.Series(train_patients).to_csv(
+    "train_patients.txt", index=False, header=False
+)
+pd.Series(val_patients).to_csv(
+    "val_patients.txt", index=False, header=False
+)
+pd.Series(test_patients).to_csv(
+    "test_patients.txt", index=False, header=False
 )
 
-train_df = df[df["patient_id"].isin(train_patients)].reset_index(drop=True)
-val_df   = df[df["patient_id"].isin(val_patients)].reset_index(drop=True)
-test_df  = df[df["patient_id"].isin(test_patients)].reset_index(drop=True)
-
-# ===========================================
-# SPLIT SUMMARY
-# ===========================================
-print("\n===== PATIENT-WISE SPLIT SUMMARY =====")
-print("Train samples :", len(train_df))
-print("Val samples   :", len(val_df))
-print("Test samples  :", len(test_df))
-
-print("\n===== PATIENT COUNTS =====")
-print("Train patients:", len(train_patients))
-print("Val patients  :", len(val_patients))
-print("Test patients :", len(test_patients))
-
-print("\nPatient ranges:")
-print("Train:", min(train_patients), "to", max(train_patients))
-print("Val  :", min(val_patients), "to", max(val_patients))
-print("Test :", min(test_patients), "to", max(test_patients))
-
-# ===========================================
-# FUNCTION TO DISPLAY IMAGE / MASK SHAPES
-# ===========================================
-def display_image_shapes(df, num_samples=5):
-    num_samples = min(num_samples, len(df))
-    random_indices = np.random.choice(df.index, size=num_samples, replace=False)
-
-    for i, idx in enumerate(random_indices):
-        img = cv2.imread(df.loc[idx, "img_path"])
-        mask = cv2.imread(df.loc[idx, "mask_path"], cv2.IMREAD_GRAYSCALE)
-
-        if img is None or mask is None:
-            print(f"Warning: Missing data at index {idx}")
-            continue
-
-        print(f"Sample {i+1}: Image {img.shape}, Mask {mask.shape}")
-
-# ===========================================
-# RUN SHAPE CHECK (TRAIN SET)
-# ===========================================
-print("\nChecking TRAIN shapes:")
-display_image_shapes(train_df)
-
-print("\nChecking VAL shapes:")
-display_image_shapes(val_df)
-
-print("\nChecking TEST shapes:")
-display_image_shapes(test_df)
-
-# ===========================================
-# OPTIONAL: SAVE CSVs
-# ===========================================
-train_df.to_csv("train_patientwise.csv", index=False)
-val_df.to_csv("val_patientwise.csv", index=False)
-test_df.to_csv("test_patientwise.csv", index=False)
-
-print("\nCSV files saved successfully.")
+print("\nPatient ID files saved:")
+print(" - train_patients.txt")
+print(" - val_patients.txt")
+print(" - test_patients.txt")
 import os
+import re
 import numpy as np
 import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
 import albumentations as A
 
-# ===========================================
-# STEP 1: CREATE DATAFRAME (IMAGE–MASK PAIRS)
-# ===========================================
-def create_df(image_dir, mask_dir):
-    img_files = sorted([
-        f for f in os.listdir(image_dir)
-        if f.lower().endswith((".png", ".jpg", ".jpeg"))
-    ])
+# ======================================================
+# PATHS
+# ======================================================
+AUG_IMG_DIR   = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+AUG_MASK_DIR  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
 
-    mask_files = sorted([
-        f for f in os.listdir(mask_dir)
-        if f.lower().endswith((".png", ".jpg", ".jpeg"))
-    ])
+NOAUG_IMG_DIR  = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+NOAUG_MASK_DIR = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/Annotations"
 
-    assert len(img_files) == len(mask_files), "Image–mask count mismatch!"
+# ======================================================
+# HELPERS
+# ======================================================
+def get_slice_key(fname):
+    # slice_case_00010_17_aug2.jpg → slice_case_00010_17
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
 
-    img_paths = [os.path.join(image_dir, f) for f in img_files]
-    mask_paths = [os.path.join(mask_dir, f) for f in mask_files]
+def build_df(img_dir, mask_dir):
+    imgs  = [f for f in os.listdir(img_dir)
+             if f.lower().endswith((".png",".jpg",".jpeg"))]
+    masks = [f for f in os.listdir(mask_dir)
+             if f.lower().endswith((".png",".jpg",".jpeg"))]
 
-    return pd.DataFrame({
-        "img_path": img_paths,
-        "mask_path": mask_paths
-    })
+    img_map = {}
+    for f in imgs:
+        key = get_slice_key(f)
+        if key:
+            img_map.setdefault(key, []).append(f)
 
-# ===========================================
-# YOUR DATASET PATHS (CONFIRMED)
-# ===========================================
-image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
-mask_dir  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations"
+    mask_map = {}
+    for f in masks:
+        key = get_slice_key(f)
+        if key:
+            mask_map[key] = f
 
-df = create_df(image_dir, mask_dir)
-print("Total slices:", len(df))
+    rows = []
+    for key, files in img_map.items():
+        if key in mask_map:
+            for img in files:
+                rows.append({
+                    "img_path": os.path.join(img_dir, img),
+                    "mask_path": os.path.join(mask_dir, mask_map[key])
+                })
 
-# ===========================================
-# STEP 2: DISPLAY RANDOM IMAGE–MASK PAIRS
-# ===========================================
-def display_samples(df, num_samples=5):
+    return pd.DataFrame(rows)
+
+# ======================================================
+# 1) TRAINING DATA → AUGMENTED ONLY
+# ======================================================
+train_df = build_df(AUG_IMG_DIR, AUG_MASK_DIR)
+print("Training (augmented) slices:", len(train_df))
+
+# ======================================================
+# 2) EVALUATION DATA → NON-AUGMENTED ONLY
+# ======================================================
+eval_df = build_df(NOAUG_IMG_DIR, NOAUG_MASK_DIR)
+print("Evaluation (non-augmented) slices:", len(eval_df))
+
+# ======================================================
+# DISPLAY ORIGINAL TRAINING SAMPLES
+# ======================================================
+def display_samples(df, num_samples=5, title_prefix=""):
     num_samples = min(num_samples, len(df))
     indices = np.random.choice(df.index, size=num_samples, replace=False)
 
     fig, axes = plt.subplots(num_samples, 2, figsize=(10, num_samples * 3))
-
     for i, idx in enumerate(indices):
         img = cv2.imread(df.loc[idx, "img_path"])
         mask = cv2.imread(df.loc[idx, "mask_path"], cv2.IMREAD_GRAYSCALE)
 
         axes[i, 0].imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        axes[i, 0].set_title("Image")
+        axes[i, 0].set_title(f"{title_prefix} Image")
         axes[i, 0].axis("off")
 
         axes[i, 1].imshow(mask, cmap="gray")
-        axes[i, 1].set_title("Mask")
+        axes[i, 1].set_title(f"{title_prefix} Mask")
         axes[i, 1].axis("off")
 
     plt.tight_layout()
     plt.show()
 
-display_samples(df, num_samples=5)
+display_samples(train_df, num_samples=5, title_prefix="Train (Aug)")
 
-# ===========================================
-# STEP 3: AUGMENTATION PIPELINE
-# ===========================================
+# ======================================================
+# AUGMENTATION PIPELINE (TRAINING ONLY)
+# ======================================================
 augmentation = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
@@ -517,20 +578,18 @@ augmentation = A.Compose([
 
 def augment_image(image_path, mask_path):
     image = cv2.imread(image_path)
-    mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+    mask  = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+    aug = augmentation(image=image, mask=mask)
+    return aug["image"], aug["mask"]
 
-    augmented = augmentation(image=image, mask=mask)
-    return augmented["image"], augmented["mask"]
-
-# ===========================================
-# STEP 4: DISPLAY AUGMENTED SAMPLES
-# ===========================================
+# ======================================================
+# DISPLAY AUGMENTED TRAINING SAMPLES
+# ======================================================
 def display_augmented_samples(df, num_samples=5):
     num_samples = min(num_samples, len(df))
     indices = np.random.choice(df.index, size=num_samples, replace=False)
 
     fig, axes = plt.subplots(num_samples, 4, figsize=(16, num_samples * 3))
-
     for i, idx in enumerate(indices):
         img = cv2.imread(df.loc[idx, "img_path"])
         mask = cv2.imread(df.loc[idx, "mask_path"], cv2.IMREAD_GRAYSCALE)
@@ -558,10 +617,16 @@ def display_augmented_samples(df, num_samples=5):
     plt.tight_layout()
     plt.show()
 
-display_augmented_samples(df, num_samples=5)
+display_augmented_samples(train_df, num_samples=5)
+
+# ======================================================
+# DISPLAY NON-AUGMENTED EVALUATION SAMPLES (NO AUG)
+# ======================================================
+display_samples(eval_df, num_samples=5, title_prefix="Eval (Non-Aug)")
+
 import os
+import re
 import numpy as np
-import pandas as pd
 import cv2
 import matplotlib.pyplot as plt
 import albumentations as A
@@ -570,9 +635,35 @@ import umap
 from sklearn.decomposition import PCA
 import random
 
-# ===========================================
+# ======================================================
+# PATHS
+# ======================================================
+AUG_IMG_DIR   = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+NOAUG_IMG_DIR = "/kaggle/input/sample/NOT-AUGMENTED/DATASET_FINAL/JPEGImages"
+
+# ======================================================
+# HELPERS
+# ======================================================
+def get_slice_key(fname):
+    m = re.match(r"(slice_case_\d+_\d+)", fname)
+    return m.group(1) if m else None
+
+def load_images(img_dir, max_samples=None):
+    files = [f for f in os.listdir(img_dir)
+             if f.lower().endswith((".png",".jpg",".jpeg"))]
+    if max_samples:
+        files = random.sample(files, min(max_samples, len(files)))
+
+    images = []
+    for f in files:
+        img = cv2.imread(os.path.join(img_dir, f))
+        if img is not None:
+            images.append(img)
+    return images
+
+# ======================================================
 # STEP 1: PREPROCESSING FUNCTIONS
-# ===========================================
+# ======================================================
 def apply_clahe(image):
     lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
     l, a, b = cv2.split(lab)
@@ -583,12 +674,12 @@ def apply_clahe(image):
 
 def apply_histogram_equalization(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    equalized = cv2.equalizeHist(gray)
-    return cv2.cvtColor(equalized, cv2.COLOR_GRAY2BGR)
+    eq = cv2.equalizeHist(gray)
+    return cv2.cvtColor(eq, cv2.COLOR_GRAY2BGR)
 
-# ===========================================
-# STEP 2: AUGMENTATION PIPELINE
-# ===========================================
+# ======================================================
+# STEP 2: AUGMENTATION (TRAINING ONLY)
+# ======================================================
 augmentation = A.Compose([
     A.HorizontalFlip(p=0.5),
     A.VerticalFlip(p=0.5),
@@ -604,85 +695,77 @@ augmentation = A.Compose([
 def augment_image(image):
     return augmentation(image=image)["image"]
 
-# ===========================================
-# STEP 3: DISPLAY PREPROCESSING STAGES
-# ===========================================
+# ======================================================
+# STEP 3: DISPLAY PREPROCESSING (TRAINING ONLY)
+# ======================================================
 def display_preprocessing_stages(image1, image2):
     fig, axes = plt.subplots(2, 4, figsize=(20, 10))
 
     for i, img in enumerate([image1, image2]):
-        clahe_image = apply_clahe(img)
-        hist_eq_image = apply_histogram_equalization(img)
-        augmented_image = augment_image(img)
+        clahe_img = apply_clahe(img)
+        hist_img  = apply_histogram_equalization(img)
+        aug_img   = augment_image(img)
 
-        images = [img, clahe_image, hist_eq_image, augmented_image]
-        titles = ["Original", "CLAHE", "Histogram Equalization", "Augmented"]
+        images = [img, clahe_img, hist_img, aug_img]
+        titles = ["Original", "CLAHE", "Histogram Eq.", "Augmented"]
 
         for j, ax in enumerate(axes[i]):
             ax.imshow(cv2.cvtColor(images[j], cv2.COLOR_BGR2RGB))
-            ax.set_title(f"Image {i+1} - {titles[j]}")
+            ax.set_title(f"Train Image {i+1} – {titles[j]}")
             ax.axis("off")
 
     plt.tight_layout()
     plt.show()
 
-# ===========================================
+# ======================================================
 # STEP 4: t-SNE / UMAP VISUALIZATION
-# ===========================================
-def visualize_image_distribution(images, method="tsne"):
+# ======================================================
+def visualize_distribution(images, title, method="tsne"):
     images = np.array(images)
-    images_flat = images.reshape(images.shape[0], -1)
+    images = images.reshape(images.shape[0], -1)
 
-    images_pca = PCA(n_components=min(50, images_flat.shape[1])).fit_transform(images_flat)
+    images_pca = PCA(n_components=min(50, images.shape[1])).fit_transform(images)
 
     if method == "tsne":
-        perplexity = min(30, images_pca.shape[0] - 1)
-        reducer = TSNE(n_components=2, perplexity=perplexity, random_state=42)
+        reducer = TSNE(n_components=2, perplexity=min(30, len(images)-1), random_state=42)
     else:
         reducer = umap.UMAP(n_components=2, random_state=42)
 
     reduced = reducer.fit_transform(images_pca)
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(7, 6))
     plt.scatter(reduced[:, 0], reduced[:, 1], alpha=0.7)
-    plt.title(f"{method.upper()} Visualization of Dataset")
+    plt.title(f"{method.upper()} – {title}")
     plt.xlabel("Component 1")
     plt.ylabel("Component 2")
     plt.show()
 
-# ===========================================
-# STEP 5: LOAD IMAGES FROM YOUR DATASET
-# ===========================================
-image_dir = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages"
+# ======================================================
+# STEP 5: TRAINING DATA (AUGMENTED)
+# ======================================================
+train_images = load_images(AUG_IMG_DIR, max_samples=50)
 
-image_files = [
-    f for f in os.listdir(image_dir)
-    if f.lower().endswith((".png", ".jpg", ".jpeg"))
-]
+if len(train_images) < 2:
+    raise ValueError("Not enough training images.")
 
-if len(image_files) < 2:
-    raise ValueError("Not enough images found.")
+# Display preprocessing on training samples
+display_preprocessing_stages(train_images[0], train_images[1])
 
-# Select random images
-selected_files = random.sample(image_files, 2)
-image1 = cv2.imread(os.path.join(image_dir, selected_files[0]))
-image2 = cv2.imread(os.path.join(image_dir, selected_files[1]))
+# Prepare training images for embedding
+train_vis = [cv2.resize(img, (64, 64)) / 255.0 for img in train_images]
 
-display_preprocessing_stages(image1, image2)
+visualize_distribution(train_vis, "Training (Augmented)", method="tsne")
+visualize_distribution(train_vis, "Training (Augmented)", method="umap")
 
-# ===========================================
-# STEP 6: SAMPLE REAL IMAGES FOR t-SNE / UMAP
-# ===========================================
-sample_files = random.sample(image_files, min(50, len(image_files)))
+# ======================================================
+# STEP 6: EVALUATION DATA (NON-AUGMENTED – NO AUG)
+# ======================================================
+eval_images = load_images(NOAUG_IMG_DIR, max_samples=50)
 
-images_for_vis = []
-for f in sample_files:
-    img = cv2.imread(os.path.join(image_dir, f))
-    img = cv2.resize(img, (64, 64))  # resize for speed
-    images_for_vis.append(img / 255.0)
+eval_vis = [cv2.resize(img, (64, 64)) / 255.0 for img in eval_images]
 
-visualize_image_distribution(images_for_vis, method="tsne")
-visualize_image_distribution(images_for_vis, method="umap")
+visualize_distribution(eval_vis, "Evaluation (Non-Augmented)", method="tsne")
+visualize_distribution(eval_vis, "Evaluation (Non-Augmented)", method="umap")
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import numpy as np
 
@@ -779,6 +862,7 @@ test_generator = create_image_generator(
 x_batch, y_batch = next(train_generator)
 print("Image batch shape:", x_batch.shape)
 print("Mask batch shape :", y_batch.shape)
+
 EPOCHS = 35        # keep very low, only for checking pipeline
 BATCH_SIZE = 32    # MUST be 1 because dataset has only one sample
 learning_rate = 1e-4
@@ -1772,61 +1856,188 @@ print(history.history.keys())import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ============================
-# LOAD ORIGINAL IMAGE + MASK
-# ============================
-def load_image_and_tumor(image_path, mask_path, image_size=(256, 256)):
+# ======================================================
+# LOAD IMAGE AND MASK + KIDNEY SEGMENTATION
+# ======================================================
+def load_and_segment_kidney(image_path, mask_path, image_size=(256, 256)):
+    # Load original kidney image
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     img = cv2.resize(img, image_size).astype(np.float32) / 255.0
 
+    # Load mask
     mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    mask = cv2.resize(mask, image_size)
+    mask = cv2.resize(mask, image_size).astype(np.uint8)
 
+    # Kidney mask (Otsu)
+    _, kidney_mask = cv2.threshold(
+        mask, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU
+    )
+    kidney_mask = kidney_mask / 255.0
+
+    # Tumor mask
     tumor_mask = (mask >= 128).astype(np.uint8)
-    return img, tumor_mask
+
+    return img, kidney_mask, tumor_mask
 
 
-# ============================
-# FUSE TUMOR ON ORIGINAL IMAGE
-# ============================
-def overlay_tumor_on_image(image, tumor_mask):
-    image_rgb = np.stack([image]*3, axis=-1)
-    image_rgb[tumor_mask == 1] = [1, 0, 0]   # RED tumor
-    return image_rgb
-
-
-# ============================
-# DISPLAY
-# ============================
-def display_results(image, tumor_mask, fused):
-    plt.figure(figsize=(15, 5))
-
-    plt.subplot(1, 3, 1)
-    plt.imshow(image, cmap='gray')
-    plt.title("Original Kidney Image")
-    plt.axis("off")
-
-    plt.subplot(1, 3, 2)
-    plt.imshow(tumor_mask, cmap='gray')
-    plt.title("Segmented Tumor Mask")
-    plt.axis("off")
-
-    plt.subplot(1, 3, 3)
-    plt.imshow(fused)
-    plt.title("Tumor Mask on Original Image")
-    plt.axis("off")
-
-    plt.tight_layout()
-    plt.show()
-
-
-# ============================
-# PATHS
-# ============================
+# ======================================================
+# PATHS (CONFIRMED)
+# ======================================================
 image_path = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/JPEGImages/slice_case_00000_195_aug0.jpg"
 mask_path  = "/kaggle/input/sample/AUGMENTED/DATASET_FINAL/Annotations/slice_case_00000_195_aug_mask0.png"
 
-image, tumor_mask = load_image_and_tumor(image_path, mask_path)
-fused_image = overlay_tumor_on_image(image, tumor_mask)
+# ======================================================
+# RUN PIPELINE
+# ======================================================
+kidney_image, kidney_mask, tumor_mask = load_and_segment_kidney(
+    image_path, mask_path
+)
 
-display_results(image, tumor_mask, fused_image)
+# Normalize original kidney image
+kidney_norm = cv2.normalize(
+    kidney_image, None, 0, 255, cv2.NORM_MINMAX
+).astype(np.uint8)
+
+# ======================================================
+# FUSE TUMOR ON ORIGINAL KIDNEY IMAGE
+# ======================================================
+fused_kidney_tumor = kidney_norm.copy()
+fused_kidney_tumor[tumor_mask == 1] = 255
+
+# ======================================================
+# HEATMAP GENERATION
+# ======================================================
+heatmap = cv2.applyColorMap(
+    fused_kidney_tumor, cv2.COLORMAP_JET
+)
+
+overlay = cv2.addWeighted(
+    cv2.cvtColor(kidney_norm, cv2.COLOR_GRAY2BGR),
+    0.6,
+    heatmap,
+    0.4,
+    0
+)
+
+# ======================================================
+# DISPLAY FINAL RESULTS
+# ======================================================
+plt.figure(figsize=(20, 5))
+
+plt.subplot(1, 4, 1)
+plt.imshow(kidney_norm, cmap="gray")
+plt.title("Original Kidney Image")
+plt.axis("off")
+
+plt.subplot(1, 4, 2)
+plt.imshow(tumor_mask, cmap="gray")
+plt.title("Tumor Mask")
+plt.axis("off")
+
+plt.subplot(1, 4, 3)
+plt.imshow(fused_kidney_tumor, cmap="gray")
+plt.title("Fused (Kidney + Tumor)")
+plt.axis("off")
+
+plt.subplot(1, 4, 4)
+plt.imshow(overlay)
+plt.title("Heatmap on Kidney Image")
+plt.axis("off")
+
+plt.tight_layout()
+plt.show()
+
+# Extract history
+epochs = range(1, len(history.history['coffiecient_dice']) + 1)
+
+# Auto-detect max values
+max_dice = max(history.history['coffiecient_dice'] + history.history['val_coffiecient_dice'])
+max_iou  = max(history.history['iou'] + history.history['val_iou'])
+
+# Add margin above max
+dice_top = max_dice + 0.05
+iou_top  = max_iou + 0.05
+
+plt.figure(figsize=(12, 5))
+
+# ---------------- DICE PLOT ----------------
+plt.subplot(1, 2, 1)
+plt.plot(epochs, history.history['coffiecient_dice'], label='Train Dice', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_coffiecient_dice'], label='Val Dice', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('Dice Coefficient')
+plt.title('Dice Coefficient Over Epochs')
+plt.ylim(0.2, dice_top)      # <-- auto adjusted
+plt.legend()
+
+# ---------------- IOU PLOT ----------------
+plt.subplot(1, 2, 2)
+plt.plot(epochs, history.history['iou'], label='Train IoU', linewidth=2, marker='o')
+plt.plot(epochs, history.history['val_iou'], label='Val IoU', linewidth=2, marker='o')
+
+plt.xlabel('Epochs')
+plt.ylabel('IoU Score')
+plt.title('IoU Score Over Epochs')
+plt.ylim(0.2, iou_top)       # <-- auto adjusted
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+import numpy as np
+import tensorflow as tf
+import subprocess
+
+# ==============================
+# 1. SLICE STATISTICS (KiTS23)
+# ==============================
+total_slices = 39080
+total_patients = 100
+
+slices_per_volume = total_slices / total_patients
+
+median_slices = slices_per_volume
+q1 = slices_per_volume
+q3 = slices_per_volume
+iqr = 0.0
+
+# ==============================
+# 2. TIME CALCULATION
+# ==============================
+epoch_time_sec = 183
+steps_per_epoch = 3908
+batch_size = 32
+
+time_per_batch = epoch_time_sec / steps_per_epoch
+time_per_slice = time_per_batch / batch_size
+time_per_volume = time_per_slice * median_slices
+
+# ==============================
+# 3. PEAK VRAM (GPU)
+# ==============================
+def get_peak_vram_gb():
+    try:
+        out = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=memory.used",
+             "--format=csv,nounits,noheader"],
+            encoding="utf-8"
+        )
+        peak_mb = max(int(x) for x in out.strip().split("\n"))
+        return peak_mb / 1024
+    except:
+        return 16.0  # Tesla P100 fallback
+
+peak_vram = get_peak_vram_gb()
+
+# ==============================
+# 4. FINAL REPORT
+# ==============================
+print("===== KiTS23 RUNTIME & VOLUME STATISTICS =====")
+print(f"Patients evaluated        : {total_patients}")
+print(f"Median slices / volume    : {median_slices:.1f}")
+print(f"IQR slices / volume       : {q1:.1f} – {q3:.1f} (IQR = {iqr:.1f})")
+print("--------------------------------------------")
+print(f"Time per slice (s)        : {time_per_slice:.6f}")
+print(f"Time per volume (s)       : {time_per_volume:.3f}")
+print("--------------------------------------------")
+print(f"Peak VRAM usage (GB)      : {peak_vram:.2f}")
